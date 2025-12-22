@@ -1,0 +1,57 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pkl
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Data files (keep sample, ignore external)
+data/external/
+*.csv
+*.json
+*.txt
+!data/sample/*.csv
+
+# Results (keep meta and examples, ignore full results)
+results/*.csv
+results/*.json
+results/*.pkl
+results/raw/
+!results/meta/
+!results/examples/
+!results/.gitkeep
+
+# Documents
+*.pdf
+*.docx
+*.doc
+*.xls
+*.xlsx
+*.pptx
+*.ppt
+*.odt
+*.ods
+*.odp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
