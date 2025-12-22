@@ -58,8 +58,13 @@ src/gentags/          # Extraction pipeline (importable)
 notebooks/            # Reproducible experiments and analysis
 scripts/              # CLI runners and utilities
 docs/                 # Methodology and study documentation
-data/sample/          # Small public-safe example data
-results/examples/     # Example outputs (small, non-sensitive)
+data/                 # Datasets (see data/README.md)
+  ├── sample/         # Small public-safe example data
+  └── study1_venues_20250117.csv  # Main dataset
+results/              # Experiment outputs (see results/README.md)
+  ├── meta/           # Reproducibility manifests
+  └── examples/       # Example outputs (small, non-sensitive)
+tests/                # Unit tests (no API keys required)
 ```
 
 ---
@@ -75,44 +80,74 @@ curl -sSL https://install.python-poetry.org | python3 -
 # Install dependencies
 poetry install
 
-# Set up API keys
+# Set up API keys (optional - tests pass without them)
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env and add your API keys for models you want to use
 ```
 
-Run scripts with Poetry:
+### Verify Installation
+
+Run unit tests (no API keys required):
 
 ```bash
-poetry run python scripts/sanity_check.py
+poetry run pytest tests/
 ```
 
-See `SETUP.md` for detailed setup instructions.
+Run smoke test (skips gracefully if no API keys):
+
+```bash
+poetry run python scripts/smoke_test_minimal.py
+```
 
 ### Sample Run
 
 ```python
-from gentags import GentagExtractor, run_experiment, load_venue_data
+from gentags import (
+    GentagExtractor,
+    run_experiment,
+    load_venue_data,
+    summarize_cost,
+    save_results
+)
 
-df = load_venue_data("data/sample/venues_sample.csv")
+# Load data
+df = load_venue_data("data/study1_venues_20250117.csv", sample_size=10)
+
+# Initialize extractor
 extractor = GentagExtractor()
-results = run_experiment(extractor, df)
+
+# Run experiment
+results = run_experiment(
+    extractor=extractor,
+    venues_df=df,
+    models=["openai"],
+    prompts=["minimal"],
+    runs=1
+)
+
+# Save results
+output_path = save_results(results, prefix="gentags")
+print(f"Results saved to: {output_path}")
+
+# Analyze costs
+summary = summarize_cost(results)
+print(f"Total cost: ${summary['total_cost_usd']:.6f}")
+print(f"Avg cost per extraction: ${summary['avg_cost_per_extraction_usd']:.6f}")
 ```
 
-Or run the smoke test:
+### Output Files
 
-```bash
-python scripts/sanity_check.py
-```
+Each experiment run produces:
 
-Each extraction records:
+- `results/gentags_<timestamp>.csv` - Full results (one row per tag)
+- `results/meta/manifest_<timestamp>.json` - Reproducibility manifest
 
-- venue ID and review count
-- model and prompt used
-- extracted gentags
-- token usage and cost (if available)
-- run identifiers and hashes for reproducibility
+Use `summarize_cost()` to generate:
 
-Parse errors and raw outputs are logged separately for auditability.
+- Extraction-level CSV (one row per extraction)
+- Cost breakdown by model/prompt
+
+See `docs/STUDY1_LOCK.md` for the frozen Study 1 methodology.
 
 ---
 

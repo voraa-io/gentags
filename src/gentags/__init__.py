@@ -18,6 +18,7 @@ from .pipeline import (
     load_results,
     validate_tags,
     compute_jaccard_similarity,
+    summarize_cost,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "load_results",
     "validate_tags",
     "compute_jaccard_similarity",
+    "summarize_cost",
 ]

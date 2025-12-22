@@ -29,4 +29,3 @@ Project maintainers are responsible for clarifying and enforcing our standards o
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org), version 2.1.
-

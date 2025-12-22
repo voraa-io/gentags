@@ -88,3 +88,101 @@ def validate_tags(tags_df: pd.DataFrame) -> Dict[str, Any]:
     
     return results
 
+
+def summarize_cost(tags_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Summarize cost metrics from tags DataFrame.
+    
+    tags_df is one row per tag. This summarizes cost at extraction level
+    and returns a dict of useful rollups + extraction-level dataframe.
+    
+    Args:
+        tags_df: DataFrame with one row per tag (includes cost_usd, tokens, etc.)
+    
+    Returns:
+        Dict with:
+        - total_cost_usd: Total cost across all extractions
+        - total_extractions: Number of unique extractions
+        - total_tags: Total number of tags
+        - avg_cost_per_extraction_usd: Average cost per extraction
+        - avg_cost_per_tag_usd: Average cost per tag
+        - by_model_prompt: DataFrame with cost stats by model/prompt
+        - extractions: DataFrame with one row per extraction (deduped)
+    """
+    df = tags_df.copy()
+    
+    # Rows that correspond to actual tags
+    tags_only = df[df["tag_raw"].notna()].copy()
+    
+    group_cols = ["run_id", "exp_id", "venue_id", "model", "prompt_type", "run_number"]
+    
+    # One row per extraction (dedupe the repeated cost across tag rows)
+    extractions = (
+        df.groupby(group_cols, dropna=False)
+        .agg(
+            timestamp=("timestamp", "first"),
+            status=("status", "first"),
+            time_seconds=("time_seconds", "first"),
+            input_tokens=("input_tokens", "first"),
+            output_tokens=("output_tokens", "first"),
+            total_tokens=("total_tokens", "first"),
+            cost_usd=("cost_usd", "first"),
+        )
+        .reset_index()
+    )
+    
+    # Attach tag counts
+    tag_counts = (
+        tags_only.groupby(group_cols, dropna=False)
+        .agg(
+            n_tags=("tag_raw", "count"),
+            n_unique_tag_eval=("tag_norm_eval", "nunique"),
+        )
+        .reset_index()
+    )
+    
+    extractions = extractions.merge(tag_counts, on=group_cols, how="left")
+    extractions["n_tags"] = extractions["n_tags"].fillna(0).astype(int)
+    extractions["n_unique_tag_eval"] = extractions["n_unique_tag_eval"].fillna(0).astype(int)
+    
+    # Cost efficiency
+    extractions["cost_per_tag"] = extractions.apply(
+        lambda r: (r["cost_usd"] / r["n_tags"]) if r["cost_usd"] and r["n_tags"] > 0 else None,
+        axis=1
+    )
+    extractions["cost_per_unique_tag"] = extractions.apply(
+        lambda r: (r["cost_usd"] / r["n_unique_tag_eval"]) if r["cost_usd"] and r["n_unique_tag_eval"] > 0 else None,
+        axis=1
+    )
+    
+    # Rollups
+    total_cost = extractions["cost_usd"].dropna().sum()
+    total_extractions = len(extractions)
+    total_tags = int(tags_only.shape[0])
+    
+    by_model_prompt = (
+        extractions.groupby(["model", "prompt_type"], dropna=False)
+        .agg(
+            n_extractions=("exp_id", "count"),
+            cost_total=("cost_usd", "sum"),
+            cost_mean=("cost_usd", "mean"),
+            tokens_mean=("total_tokens", "mean"),
+            tags_mean=("n_tags", "mean"),
+            unique_tags_mean=("n_unique_tag_eval", "mean"),
+            cost_per_tag_mean=("cost_per_tag", "mean"),
+        )
+        .reset_index()
+        .sort_values(["cost_mean"], ascending=True)
+    )
+    
+    summary = {
+        "total_cost_usd": float(total_cost),
+        "total_extractions": int(total_extractions),
+        "total_tags": int(total_tags),
+        "avg_cost_per_extraction_usd": float(total_cost / total_extractions) if total_extractions > 0 else 0.0,
+        "avg_cost_per_tag_usd": float(total_cost / total_tags) if total_tags > 0 else 0.0,
+        "by_model_prompt": by_model_prompt,
+        "extractions": extractions,
+    }
+    return summary
+

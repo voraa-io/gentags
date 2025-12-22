@@ -12,29 +12,21 @@ pyenv local 3.12.2  # or any 3.9+
 python --version  # Verify
 ```
 
-### 2. Install Dependencies
-
-You have two options:
-
-**Option A: Using pip (standard)**
+### 2. Install Poetry (if not installed)
 
 ```bash
-pip install -e .
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-**Option B: Using uv (faster, modern)**
+### 3. Install Dependencies
 
 ```bash
-# Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies
-uv pip install -e .
+poetry install
 ```
 
-Both methods read dependencies from `pyproject.toml`.
+This installs all dependencies from `pyproject.toml` into a Poetry-managed virtual environment.
 
-### 3. Set Up API Keys
+### 4. Set Up API Keys
 
 ```bash
 # Copy the example file
@@ -49,17 +41,23 @@ cp .env.example .env
 
 **Note:** You only need API keys for the models you want to use. You don't need all of them.
 
-### 4. Verify Setup
+### 5. Verify Setup
 
-Run the smoke test:
+Run unit tests (no API keys required):
 
 ```bash
-poetry run python scripts/sanity_check.py
+poetry run pytest tests/
+```
+
+Run smoke test (skips gracefully if no API keys):
+
+```bash
+poetry run python scripts/smoke_test_minimal.py
 ```
 
 **Note:** Always use `poetry run` before Python commands to ensure you're using the Poetry-managed environment.
 
-If it passes, you're ready for Week 2!
+If tests pass, you're ready for Week 2!
 
 ## What Gets Installed
 
@@ -88,8 +86,9 @@ From `pyproject.toml`:
 
 ### "Module not found"
 
-- Make sure you ran `pip install -e .` (the `-e` flag installs in editable mode)
-- Check that you're using the correct Python environment
+- Make sure you ran `poetry install`
+- Check that you're using `poetry run` before Python commands
+- Verify you're in the project root directory
 
 ### pyenv issues
 
@@ -107,5 +106,6 @@ source ~/.zshrc
 
 Once setup is complete:
 
-1. Run `python scripts/sanity_check.py` to verify
-2. Start Week 2: `python scripts/run_phase1.py --data data/external/venues_data.csv`
+1. Run `poetry run pytest tests/` to verify unit tests
+2. Run `poetry run python scripts/smoke_test_minimal.py` to verify extraction pipeline
+3. Start Week 2: `poetry run python scripts/run_phase1.py --data data/study1_venues_20250117.csv --sample-size 10`

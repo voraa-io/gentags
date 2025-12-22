@@ -1,17 +1,22 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-authors:
-  - family-names: "Research Team"
-    given-names: "Gentags"
-title: "Gentags: Research Tag Extraction Pipeline"
-version: 1.2.0
-date-released: 2024-01-01
-doi: 10.0000/example
-url: "https://github.com/yourusername/gentags"
-repository-code: "https://github.com/yourusername/gentags"
-license: MIT
-keywords:
-  - "tag extraction"
-  - "research"
-  - "natural language processing"
+message: "If you use this software in academic work, please cite it as below."
 
+title: "Gentags: A Machine-Generated Folksonomy Pipeline for Semantic Tag Extraction"
+
+version: 1.2.0
+date-released: 2025-01-17
+
+authors:
+  - family-names: "Voraa"
+
+repository-code: "https://github.com/rdji20/gentags"
+url: "https://github.com/rdji20/gentags"
+
+license: MIT
+
+keywords:
+  - folksonomy
+  - semantic tagging
+  - recommender systems
+  - natural language processing
+  - decision support
