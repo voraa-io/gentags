@@ -5,7 +5,7 @@ Experiment runner: run_experiment().
 from typing import List, Optional
 import pandas as pd
 
-from .extractor import GentagExtractor, get_venue_id
+from .extractor import GentagExtractor, get_venue_id, generate_exp_id
 from .config import PROMPTS
 from .normalize import normalize_tag, normalize_tag_eval
 from .io import save_raw_response
@@ -19,7 +19,10 @@ def run_experiment(
     runs: int = 2,
     verbose: bool = True,
     save_raw_on_error: bool = True,
-    raw_output_dir: str = "results/raw"
+    raw_output_dir: str = "results/raw",
+    checkpoint_path: Optional[str] = None,
+    checkpoint_every: int = 50,
+    resume: bool = True
 ) -> pd.DataFrame:
     """
     Run full experiment matrix and return results as DataFrame.
@@ -33,18 +36,38 @@ def run_experiment(
         verbose: Print progress
         save_raw_on_error: Save raw responses on errors
         raw_output_dir: Directory for raw error responses
+        checkpoint_path: Path to checkpoint CSV file (for resume/periodic saves)
+        checkpoint_every: Save checkpoint every N extractions (default: 50)
+        resume: If True and checkpoint exists, skip completed exp_ids
     
     Returns:
         DataFrame in tags_df format (one row per tag)
         Includes both tag_raw and tag_norm columns
     """
+    from pathlib import Path
+    
     models = models or extractor.available_models()
     prompts = prompts or list(PROMPTS.keys())
     
     total = len(venues_df) * len(models) * len(prompts) * runs
     completed = 0
     
+    # Load existing checkpoint if resuming
+    completed_exp_ids = set()
     all_results = []
+    
+    if resume and checkpoint_path and Path(checkpoint_path).exists():
+        try:
+            existing_df = pd.read_csv(checkpoint_path)
+            completed_exp_ids = set(existing_df['exp_id'].unique())
+            all_results = existing_df.to_dict('records')
+            print(f"Resuming: Found {len(completed_exp_ids)} completed extractions in checkpoint")
+            if verbose:
+                print(f"  Loaded {len(all_results)} existing rows")
+        except Exception as e:
+            print(f"Warning: Could not load checkpoint: {e}. Starting fresh.")
+    
+    extraction_count = 0
     
     for _, venue_row in venues_df.iterrows():
         venue_name = venue_row['name']
@@ -54,10 +77,21 @@ def run_experiment(
         for model in models:
             for prompt_type in prompts:
                 for run_num in range(1, runs + 1):
+                    # Generate exp_id to check if already completed (must match generate_exp_id format)
+                    exp_id = generate_exp_id(venue_id, model, prompt_type, run_num)
+                    
+                    # Skip if already completed (resume mode)
+                    if resume and exp_id in completed_exp_ids:
+                        if verbose:
+                            completed += 1
+                            print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num} (skipped - already done)")
+                        continue
+                    
                     if verbose:
                         completed += 1
                         print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num}")
                     
+                    extraction_count += 1  # Count actual extractions (not skipped)
                     result = extractor.extract(
                         model=model,
                         prompt_type=prompt_type,
@@ -122,8 +156,22 @@ def run_experiment(
                             print(f"    ✓ {len(result.tags)} tags extracted")
                         elif result.status == "parse_error":
                             print(f"    ⚠ Parse error (raw response saved to {raw_output_dir}/)")
-                        else:
-                            print(f"    ✗ Error: {result.error}")
+                    else:
+                        print(f"    ✗ Error: {result.error}")
+                    
+                    # Checkpoint periodically
+                    if checkpoint_path and extraction_count % checkpoint_every == 0:
+                        checkpoint_df = pd.DataFrame(all_results)
+                        checkpoint_df.to_csv(checkpoint_path, index=False)
+                        if verbose:
+                            print(f"    💾 Checkpoint saved ({len(all_results)} rows)")
+    
+    # Final checkpoint save
+    if checkpoint_path:
+        checkpoint_df = pd.DataFrame(all_results)
+        checkpoint_df.to_csv(checkpoint_path, index=False)
+        if verbose:
+            print(f"\n💾 Final checkpoint saved: {checkpoint_path}")
     
     return pd.DataFrame(all_results)
 

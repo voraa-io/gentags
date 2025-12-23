@@ -810,7 +810,10 @@ def run_experiment(
     runs: int = 2,
     verbose: bool = True,
     save_raw_on_error: bool = True,
-    raw_output_dir: str = "results/raw"
+    raw_output_dir: str = "results/raw",
+    checkpoint_path: Optional[str] = None,
+    checkpoint_every: int = 50,
+    resume: bool = True
 ) -> pd.DataFrame:
     """
     Run full experiment matrix and return results as DataFrame.
@@ -822,6 +825,11 @@ def run_experiment(
         prompts: List of prompt keys (default: all)
         runs: Number of runs per combination
         verbose: Print progress
+        save_raw_on_error: Save raw responses on errors
+        raw_output_dir: Directory for raw error responses
+        checkpoint_path: Path to checkpoint CSV file (for resume/periodic saves)
+        checkpoint_every: Save checkpoint every N extractions (default: 50)
+        resume: If True and checkpoint exists, skip completed exp_ids
     
     Returns:
         DataFrame in tags_df format (one row per tag)
@@ -833,7 +841,27 @@ def run_experiment(
     total = len(venues_df) * len(models) * len(prompts) * runs
     completed = 0
     
+    # Load existing checkpoint if resuming
+    completed_exp_ids = set()
     all_results = []
+    
+    if resume and checkpoint_path and Path(checkpoint_path).exists():
+        try:
+            existing_df = pd.read_csv(checkpoint_path)
+            # Only skip exp_ids where status == "success" (rerun failed/parse_error)
+            success_df = existing_df[existing_df['status'] == 'success']
+            completed_exp_ids = set(success_df['exp_id'].unique())
+            all_results = existing_df.to_dict('records')
+            print(f"Resuming: Found {len(completed_exp_ids)} successful extractions in checkpoint")
+            failed_count = len(existing_df) - len(success_df)
+            if failed_count > 0:
+                print(f"  Will rerun {failed_count} failed/parse_error extractions")
+            if verbose:
+                print(f"  Loaded {len(all_results)} existing rows")
+        except Exception as e:
+            print(f"Warning: Could not load checkpoint: {e}. Starting fresh.")
+    
+    extraction_count = 0
     
     for _, venue_row in venues_df.iterrows():
         venue_name = venue_row['name']
@@ -843,10 +871,21 @@ def run_experiment(
         for model in models:
             for prompt_type in prompts:
                 for run_num in range(1, runs + 1):
+                    # Generate exp_id to check if already completed (must match generate_exp_id format)
+                    exp_id = generate_exp_id(venue_id, model, prompt_type, run_num)
+                    
+                    # Skip if already completed (resume mode)
+                    if resume and exp_id in completed_exp_ids:
+                        if verbose:
+                            completed += 1
+                            print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num} (skipped - already done)")
+                        continue
+                    
                     if verbose:
                         completed += 1
                         print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num}")
                     
+                    extraction_count += 1  # Count actual extractions (not skipped)
                     result = extractor.extract(
                         model=model,
                         prompt_type=prompt_type,
@@ -914,6 +953,25 @@ def run_experiment(
                             print(f"    ⚠ Parse error (raw response saved to {raw_output_dir}/)")
                         else:
                             print(f"    ✗ Error: {result.error}")
+                    
+                    # Checkpoint periodically (atomic write)
+                    if checkpoint_path and extraction_count % checkpoint_every == 0:
+                        checkpoint_df = pd.DataFrame(all_results)
+                        # Atomic write: write to temp file then rename
+                        temp_path = Path(checkpoint_path).with_suffix('.tmp')
+                        checkpoint_df.to_csv(temp_path, index=False)
+                        temp_path.replace(checkpoint_path)
+                        if verbose:
+                            print(f"    💾 Checkpoint saved ({len(all_results)} rows)")
+    
+    # Final checkpoint save (atomic write)
+    if checkpoint_path:
+        checkpoint_df = pd.DataFrame(all_results)
+        temp_path = Path(checkpoint_path).with_suffix('.tmp')
+        checkpoint_df.to_csv(temp_path, index=False)
+        temp_path.replace(checkpoint_path)
+        if verbose:
+            print(f"\n💾 Final checkpoint saved: {checkpoint_path}")
     
     return pd.DataFrame(all_results)
 
@@ -1021,7 +1079,7 @@ def summarize_cost(tags_df: pd.DataFrame) -> Dict[str, Any]:
     # Rows that correspond to actual tags
     tags_only = df[df["tag_raw"].notna()].copy()
     
-    group_cols = ["run_id", "exp_id", "venue_id", "model", "prompt_type", "run_number"]
+    group_cols = ["run_id", "exp_id", "venue_id", "model", "model_key", "prompt_type", "run_number"]
     
     # One row per extraction (dedupe the repeated cost across tag rows)
     extractions = (
@@ -1038,7 +1096,9 @@ def summarize_cost(tags_df: pd.DataFrame) -> Dict[str, Any]:
         .reset_index()
     )
     
-    # Attach tag counts
+    # Attach tag counts and raw_tags_json
+    import json as json_lib
+    
     tag_counts = (
         tags_only.groupby(group_cols, dropna=False)
         .agg(
@@ -1048,9 +1108,30 @@ def summarize_cost(tags_df: pd.DataFrame) -> Dict[str, Any]:
         .reset_index()
     )
     
+    # Get raw_tags_json (stringified list of tags per extraction)
+    def get_tags_json(group):
+        """Get raw tags as JSON string for this extraction."""
+        tags = group['tag_raw'].dropna().tolist()
+        return json_lib.dumps(tags) if tags else None
+    
+    tags_json = (
+        tags_only.groupby(group_cols, dropna=False)
+        .apply(get_tags_json)
+        .reset_index(name='raw_tags_json')
+    )
+    
     extractions = extractions.merge(tag_counts, on=group_cols, how="left")
+    extractions = extractions.merge(tags_json, on=group_cols, how="left")
     extractions["n_tags"] = extractions["n_tags"].fillna(0).astype(int)
     extractions["n_unique_tag_eval"] = extractions["n_unique_tag_eval"].fillna(0).astype(int)
+    
+    # Add tags_filtered_count (from first row of each extraction)
+    filtered_counts = (
+        df.groupby(group_cols, dropna=False)
+        .agg(tags_filtered_count=("tags_filtered_count", "first"))
+        .reset_index()
+    )
+    extractions = extractions.merge(filtered_counts, on=group_cols, how="left")
     
     # Cost efficiency
     extractions["cost_per_tag"] = extractions.apply(

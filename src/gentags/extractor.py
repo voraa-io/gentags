@@ -5,9 +5,10 @@ Main extraction class: GentagExtractor + provider clients.
 import os
 import time
 import hashlib
+import random
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 from uuid import uuid4
 
 from .config import PROMPTS, SYSTEM_PROMPTS, MODELS, MAX_TAG_WORDS, MAX_TAGS_PER_EXTRACTION
@@ -39,6 +40,56 @@ def generate_run_id() -> str:
     """Generate unique run ID (timestamp + pid + random suffix for concurrency safety)."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     return f"{timestamp}_{os.getpid()}_{uuid4().hex[:6]}"
+
+
+def call_with_retry(
+    func: Callable,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0
+) -> Any:
+    """
+    Call function with retry logic and exponential backoff.
+    Retries on network errors, rate limits (429), and 5xx errors.
+    
+    Args:
+        func: Function to call (no arguments) - should raise exceptions for retryable errors
+        max_retries: Maximum number of retries (default: 3)
+        base_delay: Base delay in seconds (default: 1.0)
+        max_delay: Maximum delay in seconds (default: 60.0)
+    
+    Returns:
+        Result from func()
+    
+    Raises:
+        Last exception if all retries fail
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            
+            # Don't retry on last attempt
+            if attempt >= max_retries:
+                break
+            
+            # Exponential backoff with jitter
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            jitter = random.uniform(0, delay * 0.1)  # 10% jitter
+            total_delay = delay + jitter
+            
+            # Check if it's a rate limit error (429) - wait longer
+            error_str = str(e).lower()
+            if '429' in error_str or 'rate limit' in error_str or 'quota' in error_str:
+                total_delay = min(total_delay * 2, max_delay)
+            
+            time.sleep(total_delay)
+    
+    # All retries exhausted
+    raise last_exception
 
 
 class GentagExtractor:
@@ -247,7 +298,8 @@ class GentagExtractor:
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPTS["openai"]},
                 {"role": "user", "content": full_prompt}
-            ]
+            ],
+            "timeout": 120.0  # 120 second timeout
         }
         # Only add params if explicitly set (otherwise use provider defaults)
         if params.get("max_tokens") is not None:
@@ -255,7 +307,24 @@ class GentagExtractor:
         if params.get("temperature") is not None:
             kwargs["temperature"] = params["temperature"]
         
-        response = client.chat.completions.create(**kwargs)
+        # Retry on network errors, rate limits, and 5xx errors
+        def _call():
+            try:
+                return client.chat.completions.create(**kwargs)
+            except Exception as e:
+                error_str = str(e).lower()
+                # Retry on rate limits, network errors, 5xx
+                if any(x in error_str for x in ['429', 'rate limit', 'timeout', 'connection', '500', '502', '503', '504']):
+                    raise
+                # Don't retry on 4xx (except 429) or parse errors
+                raise
+        
+        response = call_with_retry(
+            _call,
+            max_retries=3,
+            base_delay=1.0,
+            max_delay=60.0
+        )
         
         raw = response.choices[0].message.content
         tags, parse_status = extract_json_list(raw)
@@ -300,7 +369,25 @@ class GentagExtractor:
                 config_kwargs["temperature"] = params["temperature"]
             kwargs["config"] = types.GenerateContentConfig(**config_kwargs)
         
-        response = client.models.generate_content(**kwargs)
+        # Retry on network errors, rate limits, and 5xx errors
+        def _call():
+            try:
+                return client.models.generate_content(**kwargs)
+            except Exception as e:
+                error_str = str(e).lower()
+                # Retry on rate limits, network errors, 5xx
+                if any(x in error_str for x in ['429', 'rate limit', 'timeout', 'connection', '500', '502', '503', '504', 'resource_exhausted']):
+                    raise
+                # Don't retry on 4xx (except 429) or parse errors
+                raise
+        
+        response = call_with_retry(
+            _call,
+            max_retries=3,
+            base_delay=1.0,
+            max_delay=60.0,
+            retry_on=(Exception,)
+        )
         
         raw = response.text
         tags, parse_status = extract_json_list(raw)
@@ -334,12 +421,31 @@ class GentagExtractor:
         kwargs = {
             "model": MODELS["claude"]["name"],
             "max_tokens": params.get("max_tokens") or 8192,
-            "messages": [{"role": "user", "content": full_prompt}]
+            "messages": [{"role": "user", "content": full_prompt}],
+            "timeout": 120.0  # 120 second timeout
         }
         if params.get("temperature") is not None:
             kwargs["temperature"] = params["temperature"]
         
-        message = client.messages.create(**kwargs)
+        # Retry on network errors, rate limits, and 5xx errors
+        def _call():
+            try:
+                return client.messages.create(**kwargs)
+            except Exception as e:
+                error_str = str(e).lower()
+                # Retry on rate limits, network errors, 5xx
+                if any(x in error_str for x in ['429', 'rate limit', 'timeout', 'connection', '500', '502', '503', '504', 'overloaded']):
+                    raise
+                # Don't retry on 4xx (except 429) or parse errors
+                raise
+        
+        message = call_with_retry(
+            _call,
+            max_retries=3,
+            base_delay=1.0,
+            max_delay=60.0,
+            retry_on=(Exception,)
+        )
         
         raw = message.content[0].text
         tags, parse_status = extract_json_list(raw)
@@ -374,7 +480,8 @@ class GentagExtractor:
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPTS["grok"]},
                 {"role": "user", "content": full_prompt}
-            ]
+            ],
+            "timeout": 120.0  # 120 second timeout
         }
         # Only add params if explicitly set (otherwise use provider defaults)
         if params.get("max_tokens") is not None:
@@ -382,7 +489,25 @@ class GentagExtractor:
         if params.get("temperature") is not None:
             kwargs["temperature"] = params["temperature"]
         
-        response = client.chat.completions.create(**kwargs)
+        # Retry on network errors, rate limits, and 5xx errors
+        def _call():
+            try:
+                return client.chat.completions.create(**kwargs)
+            except Exception as e:
+                error_str = str(e).lower()
+                # Retry on rate limits, network errors, 5xx
+                if any(x in error_str for x in ['429', 'rate limit', 'timeout', 'connection', '500', '502', '503', '504']):
+                    raise
+                # Don't retry on 4xx (except 429) or parse errors
+                raise
+        
+        response = call_with_retry(
+            _call,
+            max_retries=3,
+            base_delay=1.0,
+            max_delay=60.0,
+            retry_on=(Exception,)
+        )
         
         raw = response.choices[0].message.content
         tags, parse_status = extract_json_list(raw)
