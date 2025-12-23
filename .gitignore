@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Local VM
+VM.md
+
 # Python
 __pycache__/
 *.py[cod]
@@ -20,6 +23,7 @@ data/external/
 *.json
 *.txt
 !data/sample/*.csv
+!data/study1_venues_*.csv
 
 # Results (keep meta and examples, ignore full results)
 results/*.csv
