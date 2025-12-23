@@ -863,106 +863,135 @@ def run_experiment(
     
     extraction_count = 0
     
-    for _, venue_row in venues_df.iterrows():
-        venue_name = venue_row['name']
-        venue_reviews = venue_row['google_reviews']
-        venue_id = venue_row.get('id') or get_venue_id(venue_name)
-        
-        for model in models:
-            for prompt_type in prompts:
-                for run_num in range(1, runs + 1):
-                    # Generate exp_id to check if already completed (must match generate_exp_id format)
-                    exp_id = generate_exp_id(venue_id, model, prompt_type, run_num)
-                    
-                    # Skip if already completed (resume mode)
-                    if resume and exp_id in completed_exp_ids:
-                        if verbose:
-                            completed += 1
-                            print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num} (skipped - already done)")
-                        continue
-                    
-                    if verbose:
-                        completed += 1
-                        print(f"[{completed}/{total}] {venue_name} | {model} | {prompt_type} | run {run_num}")
-                    
-                    extraction_count += 1  # Count actual extractions (not skipped)
-                    result = extractor.extract(
-                        model=model,
-                        prompt_type=prompt_type,
-                        venue_name=venue_name,
-                        venue_reviews=venue_reviews,
-                        run_number=run_num,
-                        venue_id=venue_id
-                    )
-                    
-                    # Convert to rows (one per tag)
-                    base_row = {
-                        "run_id": result.run_id,
-                        "venue_id": result.venue_id,
-                        "venue_name": result.venue_name,
-                        "model": result.model,  # Full model name (e.g., "gpt-5-nano")
-                        "model_key": model,  # Model key (e.g., "openai", "gemini", "claude", "grok")
-                        "prompt_type": result.prompt_type,
-                        "run_number": result.run_number,
-                        "exp_id": result.exp_id,
-                        "timestamp": result.timestamp,
-                        "num_reviews": result.num_reviews,
-                        "reviews_total_chars": result.reviews_total_chars,
-                        "time_seconds": result.time_seconds,
-                        "input_tokens": result.input_tokens,
-                        "output_tokens": result.output_tokens,
-                        "total_tokens": result.total_tokens,
-                        "cost_usd": result.cost_usd,
-                        "status": result.status,
-                        "prompt_hash": result.prompt_hash,
-                        "system_prompt_hash": result.system_prompt_hash,
-                        "input_prompt_hash": result.input_prompt_hash,
-                        "tags_filtered_count": len(result.tags_filtered_out),
-                        "extraction_phase": "phase1"
-                    }
-                    
-                    if result.tags:
-                        for tag in result.tags:
+    # Initialize progress bar if verbose
+    from tqdm import tqdm
+    pbar = None
+    if verbose:
+        pbar = tqdm(
+            total=total,
+            desc="Extracting",
+            unit="extraction",
+            ncols=100,
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+        )
+        # Set initial progress for already completed items
+        if completed_exp_ids:
+            pbar.update(len(completed_exp_ids))
+    
+    try:
+        for _, venue_row in venues_df.iterrows():
+            venue_name = venue_row['name']
+            venue_reviews = venue_row['google_reviews']
+            venue_id = venue_row.get('id') or get_venue_id(venue_name)
+            
+            for model in models:
+                for prompt_type in prompts:
+                    for run_num in range(1, runs + 1):
+                        # Generate exp_id to check if already completed (must match generate_exp_id format)
+                        exp_id = generate_exp_id(venue_id, model, prompt_type, run_num)
+                        
+                        # Skip if already completed (resume mode)
+                        if resume and exp_id in completed_exp_ids:
+                            if pbar:
+                                pbar.update(1)
+                                pbar.set_postfix_str(f"⏭️  {venue_name[:30]} | {model} | {prompt_type} | run {run_num}")
+                            continue
+                        
+                        if pbar:
+                            pbar.set_postfix_str(f"🔄 {venue_name[:30]} | {model} | {prompt_type} | run {run_num}")
+                        
+                        extraction_count += 1  # Count actual extractions (not skipped)
+                        result = extractor.extract(
+                            model=model,
+                            prompt_type=prompt_type,
+                            venue_name=venue_name,
+                            venue_reviews=venue_reviews,
+                            run_number=run_num,
+                            venue_id=venue_id
+                        )
+                        
+                        # Convert to rows (one per tag)
+                        base_row = {
+                            "run_id": result.run_id,
+                            "venue_id": result.venue_id,
+                            "venue_name": result.venue_name,
+                            "model": result.model,  # Full model name (e.g., "gpt-5-nano")
+                            "model_key": model,  # Model key (e.g., "openai", "gemini", "claude", "grok")
+                            "prompt_type": result.prompt_type,
+                            "run_number": result.run_number,
+                            "exp_id": result.exp_id,
+                            "timestamp": result.timestamp,
+                            "num_reviews": result.num_reviews,
+                            "reviews_total_chars": result.reviews_total_chars,
+                            "time_seconds": result.time_seconds,
+                            "input_tokens": result.input_tokens,
+                            "output_tokens": result.output_tokens,
+                            "total_tokens": result.total_tokens,
+                            "cost_usd": result.cost_usd,
+                            "status": result.status,
+                            "prompt_hash": result.prompt_hash,
+                            "system_prompt_hash": result.system_prompt_hash,
+                            "input_prompt_hash": result.input_prompt_hash,
+                                "tags_filtered_count": len(result.tags_filtered_out),
+                            "extraction_phase": "phase1"
+                        }
+                        
+                        if result.tags:
+                            for tag in result.tags:
+                                row = base_row.copy()
+                                row.update({
+                                    "tag_raw": tag,
+                                    "tag_norm": normalize_tag(tag),
+                                    "tag_norm_eval": normalize_tag_eval(tag),
+                                    "word_count": len(tag.split()),
+                                })
+                                all_results.append(row)
+                        else:
+                            # Log extraction with no tags (for tracking parse errors)
                             row = base_row.copy()
                             row.update({
-                                "tag_raw": tag,
-                                "tag_norm": normalize_tag(tag),
-                                "tag_norm_eval": normalize_tag_eval(tag),
-                                "word_count": len(tag.split()),
+                                "tag_raw": None,
+                                "tag_norm": None,
+                                "tag_norm_eval": None,
+                                "word_count": None,
                             })
                             all_results.append(row)
-                    else:
-                        # Log extraction with no tags (for tracking parse errors)
-                        row = base_row.copy()
-                        row.update({
-                            "tag_raw": None,
-                            "tag_norm": None,
-                            "tag_norm_eval": None,
-                            "word_count": None,
-                        })
-                        all_results.append(row)
-                    
-                    # Save raw response on error/parse_error
-                    if save_raw_on_error and result.status in ("error", "parse_error") and result.raw_response:
-                        save_raw_response(result.raw_response, result.exp_id, result.run_id, raw_output_dir)
-                    
-                    if verbose:
-                        if result.status == "success":
-                            print(f"    ✓ {len(result.tags)} tags extracted")
-                        elif result.status == "parse_error":
-                            print(f"    ⚠ Parse error (raw response saved to {raw_output_dir}/)")
-                        else:
-                            print(f"    ✗ Error: {result.error}")
-                    
-                    # Checkpoint periodically (atomic write)
-                    if checkpoint_path and extraction_count % checkpoint_every == 0:
-                        checkpoint_df = pd.DataFrame(all_results)
-                        # Atomic write: write to temp file then rename
-                        temp_path = Path(checkpoint_path).with_suffix('.tmp')
-                        checkpoint_df.to_csv(temp_path, index=False)
-                        temp_path.replace(checkpoint_path)
-                        if verbose:
-                            print(f"    💾 Checkpoint saved ({len(all_results)} rows)")
+                        
+                        # Save raw response on error/parse_error
+                        if save_raw_on_error and result.status in ("error", "parse_error") and result.raw_response:
+                            save_raw_response(result.raw_response, result.exp_id, result.run_id, raw_output_dir)
+                        
+                        # Update progress bar with status
+                        if pbar:
+                            status_icon = {
+                                "success": "✓",
+                                "parse_error": "⚠",
+                                "error": "✗"
+                            }.get(result.status, "?")
+                            
+                            if result.status == "success":
+                                status_msg = f"{status_icon} {len(result.tags)} tags | ${result.cost_usd:.4f} | {result.time_seconds:.1f}s"
+                            elif result.status == "parse_error":
+                                status_msg = f"{status_icon} Parse error"
+                            else:
+                                status_msg = f"{status_icon} Error: {result.error[:30] if result.error else 'Unknown'}"
+                            
+                            pbar.set_postfix_str(status_msg)
+                            pbar.update(1)
+                        
+                        # Checkpoint periodically (atomic write)
+                        if checkpoint_path and extraction_count % checkpoint_every == 0:
+                            checkpoint_df = pd.DataFrame(all_results)
+                            # Atomic write: write to temp file then rename
+                            temp_path = Path(checkpoint_path).with_suffix('.tmp')
+                            checkpoint_df.to_csv(temp_path, index=False)
+                            temp_path.replace(checkpoint_path)
+                            if pbar:
+                                pbar.write(f"💾 Checkpoint saved ({len(all_results)} rows)")
+    
+    finally:
+        if pbar:
+            pbar.close()
     
     # Final checkpoint save (atomic write)
     if checkpoint_path:
@@ -971,7 +1000,7 @@ def run_experiment(
         checkpoint_df.to_csv(temp_path, index=False)
         temp_path.replace(checkpoint_path)
         if verbose:
-            print(f"\n💾 Final checkpoint saved: {checkpoint_path}")
+            print(f"💾 Final checkpoint saved: {checkpoint_path}")
     
     return pd.DataFrame(all_results)
 
@@ -1116,7 +1145,7 @@ def summarize_cost(tags_df: pd.DataFrame) -> Dict[str, Any]:
     
     tags_json = (
         tags_only.groupby(group_cols, dropna=False)
-        .apply(get_tags_json)
+        .apply(get_tags_json, include_groups=False)
         .reset_index(name='raw_tags_json')
     )
     

@@ -171,46 +171,8 @@ def main():
         print(f"\n✅ All validations passed. Remove --dry-run to run for real.")
         return 0
     
-    # Cost guard: Run pilot to estimate cost
-    pilot_venue_count = min(args.pilot_venues, len(venues_df))
-    if pilot_venue_count == 0:
-        print("ERROR: No venues available for pilot run.")
-        return 1
-    
-    print(f"\n💰 Cost estimation (pilot run with {pilot_venue_count} venues)...")
-    print("  (This will make real API calls and cost money)")
-    pilot_df = venues_df.head(pilot_venue_count).copy()
-    pilot_results = run_experiment(
-        extractor=extractor,
-        venues_df=pilot_df,
-        models=models_to_use,
-        prompts=prompts_to_use,
-        runs=1,  # Just 1 run for pilot
-        verbose=False,
-        save_raw_on_error=False
-    )
-    pilot_summary = summarize_cost(pilot_results)
-    pilot_extractions = len(pilot_df) * len(models_to_use) * len(prompts_to_use) * 1
-    avg_cost_per_extraction = pilot_summary['avg_cost_per_extraction_usd']
-    
-    if pilot_extractions == 0:
-        print("ERROR: Pilot run produced no extractions. Aborting.")
-        return 1
-    
-    estimated_total_cost = avg_cost_per_extraction * total_extractions
-    
-    print(f"  Pilot: {pilot_extractions} extractions = ${pilot_summary['total_cost_usd']:.6f}")
-    print(f"  Avg cost per extraction: ${avg_cost_per_extraction:.6f}")
-    print(f"  Estimated total cost ({total_extractions} extractions): ${estimated_total_cost:.2f}")
-    
-    if estimated_total_cost > args.max_cost_usd:
-        print(f"\n⚠️  WARNING: Estimated cost (${estimated_total_cost:.2f}) exceeds max (${args.max_cost_usd:.2f})")
-        response = input(f"Continue anyway? (yes/no): ")
-        if response.lower() not in ['yes', 'y']:
-            print("Aborted.")
-            return 1
-    
     # Display run ID (will be reused if --run-id was provided)
+    is_resuming = args.run_id and checkpoint_path.exists()
     if args.run_id:
         print(f"\n📌 Using existing run ID: {run_id_prefix}")
         print(f"   Checkpoint: {checkpoint_path}")
@@ -221,6 +183,49 @@ def main():
     else:
         print(f"\n📌 New run ID: {run_id_prefix}")
     
+    # Cost guard: Run pilot to estimate cost (skip if resuming)
+    estimated_total_cost = None
+    if not is_resuming:
+        pilot_venue_count = min(args.pilot_venues, len(venues_df))
+        if pilot_venue_count == 0:
+            print("ERROR: No venues available for pilot run.")
+            return 1
+        
+        print(f"\n💰 Cost estimation (pilot run with {pilot_venue_count} venues)...")
+        print("  (This will make real API calls and cost money)")
+        pilot_df = venues_df.head(pilot_venue_count).copy()
+        pilot_results = run_experiment(
+            extractor=extractor,
+            venues_df=pilot_df,
+            models=models_to_use,
+            prompts=prompts_to_use,
+            runs=1,  # Just 1 run for pilot
+            verbose=False,
+            save_raw_on_error=False
+        )
+        pilot_summary = summarize_cost(pilot_results)
+        pilot_extractions = len(pilot_df) * len(models_to_use) * len(prompts_to_use) * 1
+        avg_cost_per_extraction = pilot_summary['avg_cost_per_extraction_usd']
+        
+        if pilot_extractions == 0:
+            print("ERROR: Pilot run produced no extractions. Aborting.")
+            return 1
+        
+        estimated_total_cost = avg_cost_per_extraction * total_extractions
+        
+        print(f"  Pilot: {pilot_extractions} extractions = ${pilot_summary['total_cost_usd']:.6f}")
+        print(f"  Avg cost per extraction: ${avg_cost_per_extraction:.6f}")
+        print(f"  Estimated total cost ({total_extractions} extractions): ${estimated_total_cost:.2f}")
+        
+        if estimated_total_cost > args.max_cost_usd:
+            print(f"\n⚠️  WARNING: Estimated cost (${estimated_total_cost:.2f}) exceeds max (${args.max_cost_usd:.2f})")
+            response = input(f"Continue anyway? (yes/no): ")
+            if response.lower() not in ['yes', 'y']:
+                print("Aborted.")
+                return 1
+    else:
+        print(f"\n💰 Skipping pilot cost estimation (resume mode)")
+    
     # Run experiment
     print(f"\nRunning experiment...")
     print(f"  Models: {models_to_use}")
@@ -228,7 +233,8 @@ def main():
     print(f"  Runs per combination: {args.runs}")
     print(f"  Total extractions: {total_extractions}")
     print(f"  Checkpoint: {checkpoint_path}")
-    print(f"  Estimated cost: ${estimated_total_cost:.2f}")
+    if estimated_total_cost is not None:
+        print(f"  Estimated cost: ${estimated_total_cost:.2f}")
     
     results_df = run_experiment(
         extractor=extractor,
