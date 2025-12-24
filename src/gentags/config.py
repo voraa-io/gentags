@@ -107,7 +107,7 @@ MODELS = {
         "name": "grok-4",
         "provider": "xAI",
         "short": "grok4",
-        "pricing": {"input_per_mtok": 0.0, "output_per_mtok": 0.0},  # TODO: Update with actual pricing
+        "pricing": {"input_per_mtok": 2.00, "output_per_mtok": 10.00},  # Grok-4: $2/M input, $10/M output
         "params": {
             "max_tokens": None,  # Provider default
             "temperature": None  # Provider default

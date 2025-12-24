@@ -134,7 +134,7 @@ MODELS = {
         "name": "grok-4",
         "provider": "xAI",
         "short": "grok4",
-        "pricing": {"input_per_mtok": 0.0, "output_per_mtok": 0.0},  # TODO: Update with actual pricing
+        "pricing": {"input_per_mtok": 2.00, "output_per_mtok": 10.00},  # Grok-4: $2/M input, $10/M output
         "params": {
             "max_tokens": None,  # Provider default
             "temperature": None  # Provider default
@@ -970,7 +970,8 @@ def run_experiment(
                             }.get(result.status, "?")
                             
                             if result.status == "success":
-                                status_msg = f"{status_icon} {len(result.tags)} tags | ${result.cost_usd:.4f} | {result.time_seconds:.1f}s"
+                                cost_str = f"${result.cost_usd:.4f}" if result.cost_usd is not None else "N/A"
+                                status_msg = f"{status_icon} {len(result.tags)} tags | {cost_str} | {result.time_seconds:.1f}s"
                             elif result.status == "parse_error":
                                 status_msg = f"{status_icon} Parse error"
                             else:
