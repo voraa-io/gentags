@@ -14,10 +14,7 @@ from pathlib import Path
 # Add src to path (OK for smoke test; long-term prefer `poetry run`)
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from gentags.extractor import GentagExtractor
-from gentags.data import load_venue_data
-from gentags.experiment import run_experiment
-from gentags.io import save_results
+from gentags import GentagExtractor, load_venue_data, run_experiment, save_results
 
 
 def main():
