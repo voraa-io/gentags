@@ -74,6 +74,22 @@ def get_embedding_client():
     try:
         from openai import OpenAI
         import os
+        from pathlib import Path
+        
+        # Try to load .env file if it exists (same pattern as pipeline.py)
+        try:
+            from dotenv import load_dotenv
+            # Try common locations (no hardcoded user paths)
+            for path in [
+                Path(__file__).parent.parent / ".env",  # repo root from scripts/
+                Path.cwd() / ".env"  # current working directory
+            ]:
+                if path.exists():
+                    load_dotenv(path)
+                    break
+        except ImportError:
+            pass  # dotenv not installed, rely on system env vars
+        
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment")
