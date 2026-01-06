@@ -51,3 +51,4 @@ This "as-is" approach ensures:
 ## Version Tracking
 
 Model configurations are frozen in `src/gentags/config.py` with version tracking. Any changes require a new study version.
+
