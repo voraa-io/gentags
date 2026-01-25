@@ -35,13 +35,18 @@ plt.rcParams["font.size"] = 10
 
 def load_tables():
     """Load all Phase 2 tables."""
-    return {
+    tables = {
         "run_stability": pd.read_csv(TABLES_DIR / "run_stability.csv"),
         "prompt_sensitivity": pd.read_csv(TABLES_DIR / "prompt_sensitivity.csv"),
         "model_sensitivity": pd.read_csv(TABLES_DIR / "model_sensitivity.csv"),
         "retention": pd.read_csv(TABLES_DIR / "retention.csv"),
         "uncertainty_dispersion": pd.read_csv(TABLES_DIR / "uncertainty_dispersion.csv"),
     }
+    # Optional: sparsity analysis (may not exist in older runs)
+    sparsity_path = TABLES_DIR / "sparsity_analysis.csv"
+    if sparsity_path.exists():
+        tables["sparsity_analysis"] = pd.read_csv(sparsity_path)
+    return tables
 
 
 def plot_1_run_stability(run_stability: pd.DataFrame):
@@ -285,10 +290,90 @@ def plot_6_surface_vs_semantic(run_stability: pd.DataFrame):
     print(f"  Saved: {PLOTS_DIR / '6_surface_vs_semantic.png'}")
 
 
+def plot_7_sparsity(sparsity_df: pd.DataFrame):
+    """Plot 7: S4 Sparsity Analysis - Token count vs variability."""
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Compute correlation
+    corr = sparsity_df['total_tokens'].corr(sparsity_df['mean_pairwise_distance'])
+
+    # Left: Scatter plot
+    ax1 = axes[0]
+    ax1.scatter(
+        sparsity_df['total_tokens'],
+        sparsity_df['mean_pairwise_distance'],
+        alpha=0.5,
+        s=30,
+        color='steelblue'
+    )
+
+    # Add trend line
+    z = np.polyfit(sparsity_df['total_tokens'], sparsity_df['mean_pairwise_distance'], 1)
+    p = np.poly1d(z)
+    x_line = np.linspace(sparsity_df['total_tokens'].min(), sparsity_df['total_tokens'].max(), 100)
+    ax1.plot(x_line, p(x_line), "r--", alpha=0.8, label=f"Trend (r={corr:.3f})")
+
+    ax1.set_xlabel("Total Tokens (Evidence Amount)")
+    ax1.set_ylabel("Mean Pairwise Distance (Variability)")
+    ax1.set_title(f"S4: Evidence vs Variability (r={corr:.3f})")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Right: Box plot by token bucket
+    ax2 = axes[1]
+    if 'token_bucket' in sparsity_df.columns:
+        bucket_order = ['<200', '200-400', '400-600', '600-1000', '>1000']
+        existing_buckets = [b for b in bucket_order if b in sparsity_df['token_bucket'].values]
+        sparsity_df_sorted = sparsity_df[sparsity_df['token_bucket'].isin(existing_buckets)]
+
+        sns.boxplot(
+            data=sparsity_df_sorted,
+            x='token_bucket',
+            y='mean_pairwise_distance',
+            order=existing_buckets,
+            ax=ax2,
+            hue='token_bucket',
+            legend=False,
+            palette='Blues'
+        )
+    else:
+        # Create buckets if not present
+        sparsity_df['token_bucket'] = pd.cut(
+            sparsity_df['total_tokens'],
+            bins=[0, 200, 400, 600, 1000, float('inf')],
+            labels=['<200', '200-400', '400-600', '600-1000', '>1000']
+        )
+        bucket_order = ['<200', '200-400', '400-600', '600-1000', '>1000']
+        existing_buckets = [b for b in bucket_order if b in sparsity_df['token_bucket'].values]
+        sparsity_df_sorted = sparsity_df[sparsity_df['token_bucket'].isin(existing_buckets)]
+
+        sns.boxplot(
+            data=sparsity_df_sorted,
+            x='token_bucket',
+            y='mean_pairwise_distance',
+            order=existing_buckets,
+            ax=ax2,
+            hue='token_bucket',
+            legend=False,
+            palette='Blues'
+        )
+
+    ax2.set_xlabel("Token Bucket (Evidence Amount)")
+    ax2.set_ylabel("Mean Pairwise Distance (Variability)")
+    ax2.set_title("Variability by Evidence Amount")
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(PLOTS_DIR / "7_sparsity_analysis.png", bbox_inches="tight")
+    plt.close()
+    print(f"  Saved: {PLOTS_DIR / '7_sparsity_analysis.png'}")
+
+
 def main():
     """Generate all Phase 2 plots."""
+    global TABLES_DIR, PLOTS_DIR
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Phase 2: Generate plots")
     parser.add_argument(
         "--tables-dir",
@@ -302,10 +387,9 @@ def main():
         default=str(PLOTS_DIR),
         help="Directory to save plots"
     )
-    
+
     args = parser.parse_args()
-    
-    global TABLES_DIR, PLOTS_DIR
+
     TABLES_DIR = Path(args.tables_dir)
     PLOTS_DIR = Path(args.plots_dir)
     
@@ -343,7 +427,13 @@ def main():
     
     print("\n6. Surface vs semantic...")
     plot_6_surface_vs_semantic(tables["run_stability"])
-    
+
+    if "sparsity_analysis" in tables:
+        print("\n7. Sparsity analysis (S4)...")
+        plot_7_sparsity(tables["sparsity_analysis"])
+    else:
+        print("\n7. Sparsity analysis (S4)... SKIPPED (no sparsity_analysis.csv)")
+
     print("\n✅ All plots generated!")
     print(f"   Plots saved to: {PLOTS_DIR}")
 

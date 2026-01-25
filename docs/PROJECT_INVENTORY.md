@@ -15,7 +15,7 @@
   - Atomized (one idea)
   - Composable / scan-friendly
   - Embed-friendly
-  - Emergent folksonomy (not taxonomy)
+  - Emergent tag space (folksonomy-like, not taxonomy)
   - Zero-shot extraction (no examples / no ontology hints)
   - Explicit exclusions: ratings, predefined categories/slots, sentiment labels, summaries, ontology
 

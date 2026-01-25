@@ -30,6 +30,8 @@ results/*.csv
 results/*.json
 results/*.pkl
 results/raw/
+results/phase2_cache/
+results/*.log
 !results/meta/
 !results/examples/
 !results/.gitkeep
@@ -59,3 +61,6 @@ results/raw/
 # OS
 .DS_Store
 Thumbs.db
+
+# Agents
+AGENTS.md

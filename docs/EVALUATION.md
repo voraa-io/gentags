@@ -14,7 +14,7 @@ Accordingly, evaluation focuses on the following research questions:
 - Do different models agree on extracted semantics?
 - How sensitive are gentags to prompt constraints?
 - How much semantic information is retained after compression?
-- What are the distributional properties of the resulting folksonomy?
+- What are the distributional properties of the resulting tag space?
 
 No evaluation in this study measures recommendation accuracy, ranking performance, or user behavior.
 
@@ -70,7 +70,7 @@ Gentags were compared across different prompt formulations for the same model an
 
 ### Purpose
 
-This analysis measures how prompt constraints shape the emergent folksonomy and whether certain prompts bias toward concreteness, conservatism, or verbosity.
+This analysis measures how prompt constraints shape the emergent tag space and whether certain prompts bias toward concreteness, conservatism, or verbosity.
 
 ---
 
@@ -154,7 +154,7 @@ Study 1 evaluation establishes:
 - Whether gentags are stable
 - Whether they generalize across models
 - Whether they retain decision-relevant semantics
-- Whether they form a coherent emergent folksonomy
+- Whether they form a coherent emergent tag space
 
 These results motivate future work on synthetic gentags and downstream recommendation systems.
 

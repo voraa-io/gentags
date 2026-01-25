@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software in academic work, please cite it as below."
 
-title: "Gentags: A Machine-Generated Folksonomy Pipeline for Semantic Tag Extraction"
+title: "Gentags: Emergent Semantic Tags from Sparse Reviews"
 
 version: 1.2.0
 date-released: 2025-01-17

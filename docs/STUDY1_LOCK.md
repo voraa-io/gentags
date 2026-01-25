@@ -10,7 +10,9 @@ Any future changes belong to **Study 2+** and will be explicitly versioned.
 
 ## 1. Scope of Study 1
 
-Study 1 evaluates the feasibility and behavior of **machine-generated folksonomies** (gentags) extracted from sparse venue reviews using large language models.
+Study 1 evaluates the feasibility and behavior of **LLM-extracted emergent semantic tags** (gentags) from sparse venue reviews.
+
+While gentags are not user-generated, they exhibit folksonomy-like properties: emergent vocabulary, interpretability, and compositional use—without relying on predefined ontologies.
 
 **Study 1 does NOT evaluate:**
 

@@ -56,7 +56,7 @@ A **gentag** is defined as:
 
 Gentags are designed to function as:
 
-- A machine-generated folksonomy
+- A folksonomy-like semantic layer (emergent, interpretable, non-ontological)
 - Human-readable semantic metadata
 - Embed-friendly units for downstream retrieval
 
@@ -224,4 +224,4 @@ These are addressed in future work.
 
 ## Summary
 
-This methodology isolates the behavior of LLMs as semantic extractors under sparse data conditions, enabling a controlled analysis of emergent machine-generated folksonomies without conflating extraction quality with downstream system performance.
+This methodology isolates the behavior of LLMs as semantic extractors under sparse data conditions, enabling a controlled analysis of emergent semantic tag spaces without conflating extraction quality with downstream system performance.
