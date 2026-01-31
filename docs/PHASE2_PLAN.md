@@ -70,9 +70,9 @@ Phase 2 analyzes the semantic properties of gentags using embedding-based metric
   - Delta retention per token: `delta_retention / total_tokens`
   - Delta retention per tag: `delta_retention / n_tags`
 
-### Block F: Uncertainty Signal
+### Block F: Dispersion / Identifiability
 
-**Question:** What is the structure of variability?
+**Question:** What is the structure of variability (dispersion) across observer samples?
 
 - **Unit:** venue
 - **Definition:** Representation dispersion (not entropy)
@@ -145,7 +145,7 @@ Phase 2 analyzes the semantic properties of gentags using embedding-based metric
    - Run stability: same model/prompt, run1 vs run2
    - Prompt sensitivity: same model, different prompts
    - Model sensitivity: same prompt, different models
-4. **Uncertainty as signal:** When gentag sets change substantially across runs/prompts/models, downstream systems can treat the venue representation as lower confidence
+4. **Dispersion as signal:** When gentag sets change substantially across runs/prompts/models, this indicates lower identifiability under the same evidence
 5. **Cost-information tradeoff:** Gentags offer favorable compression while retaining semantic meaning
 
 ## Implementation
@@ -177,7 +177,7 @@ results/phase2/
 │   ├── prompt_sensitivity.csv
 │   ├── model_sensitivity.csv
 │   ├── retention.csv (with baselines: random, shuffled, topk)
-│   └── uncertainty_dispersion.csv
+│   └── uncertainty_dispersion.csv  # dispersion table (filename retained)
 └── plots/
     ├── 1_run_stability.png
     ├── 2_prompt_sensitivity.png

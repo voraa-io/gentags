@@ -55,7 +55,7 @@ Saved in `results/phase2/tables/`:
 
 **Expected row count:** ~13,272 (one per extraction)
 
-#### 5. `uncertainty_dispersion.csv`
+#### 5. `uncertainty_dispersion.csv` (dispersion table; filename retained)
 **Columns:**
 - `venue_id`
 - `mean_pairwise_distance` (PRIMARY)
@@ -210,7 +210,7 @@ You must be able to report:
    - Generic venues (if true)
    - Other interpretable factors
 
-That's "uncertainty signal": dispersion = reliability proxy.
+That's dispersion as an identifiability signal: higher dispersion = less constrained representation.
 
 ---
 
@@ -296,4 +296,3 @@ poetry run python scripts/phase2_plots.py
 
 **Last Updated:** 2025-01-XX
 **Status:** Code fixes complete, plotting script pending
-

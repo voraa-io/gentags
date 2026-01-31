@@ -41,8 +41,8 @@
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| Correlation (reviews vs variability) | **-0.317** | More evidence → less variability |
-| Sparse venues variability | Higher | Uncertainty signal works |
+| Correlation (reviews vs dispersion) | **-0.317** | More evidence → lower dispersion |
+| Sparse venues dispersion | Higher | Evidence weakly constrains representations |
 
 ---
 
@@ -62,18 +62,16 @@
 
 ### The System Model
 
-An LLM-based autonomous system has:
+A system requiring persistent semantic state has:
 - **Environment:** Documents, reviews, logs, sensors
 - **Goal:** Implicit or explicit decision-making
 - **Constraints:** Limited context window, limited compute, costs for querying, costs for mistakes
 
 **The key problem:**
-> The system must decide when it knows enough to act and when it must seek more information.
-
-That's **control**.
+> The system must maintain an inspectable semantic state as evidence changes.
 
 Gentags are NOT for retrieval UX. They are for:
-> **Externalizing semantic state so the system can monitor itself.**
+> **Externalizing semantic state into a factorized, persistent, and attributable representation.**
 
 ---
 
@@ -93,7 +91,7 @@ This belief state is what the system uses to:
 - Make decisions
 - Detect change
 - Attribute causes
-- Monitor uncertainty
+- Monitor state changes
 
 Different representations produce different belief states with different properties.
 
@@ -116,7 +114,7 @@ B_raw = full review text (concatenated)
 | Storage | Huge (full text) |
 | Structure | Unstructured |
 | Reasoning cost | High (must re-read everything) |
-| Uncertainty signal | None explicit |
+| Identifiability signal | None explicit |
 | Attribution | None |
 
 **Control implication:**
@@ -140,7 +138,7 @@ B_embed = vector(E) ∈ ℝ^3072
 | Storage | Compact (fixed size) |
 | Structure | Dense, continuous |
 | Reasoning cost | Low (similarity search) |
-| Uncertainty signal | None |
+| Identifiability signal | None |
 | Attribution | **None** |
 
 **Control implication:**
@@ -170,7 +168,7 @@ LLM(E, goal) → action
 | Storage | None |
 | Structure | N/A |
 | Reasoning cost | **Highest** (full LLM call every time) |
-| Uncertainty signal | None persistent |
+| Identifiability signal | None persistent |
 | Attribution | Per-query only |
 
 **Control implication:**
@@ -198,7 +196,7 @@ When we say "model-in-the-loop with no persistent representation," we mean:
 |-----------|---------|-------------------|
 | "Is venue quiet?" | Check if "quiet" ∈ tags | LLM call with all reviews |
 | "What changed since yesterday?" | Diff tag sets | **Impossible** (no prior state) |
-| "Which aspects are uncertain?" | Check tag variance | **Impossible** |
+| "Which aspects changed?" | Diff tag sets | **Impossible** |
 | 100 questions about same venue | 100 tag lookups | 100 LLM calls |
 
 ---
@@ -218,13 +216,13 @@ Plus optional pooled embedding for similarity.
 | Storage | Moderate (tags + optional embedding) |
 | Structure | **Discrete, compositional, factorized** |
 | Reasoning cost | Low (tag lookup + similarity) |
-| Uncertainty signal | **Yes** (variance across extractions) |
+| Identifiability signal | **Yes** (dispersion across extractions) |
 | Attribution | **Yes** (tags map to facets) |
 
 **Control implication:**
 - Observable semantic variables
 - Change detection: "quiet disappeared, crowded appeared"
-- Uncertainty proxies: high variance = low confidence
+- Dispersion indicates lower identifiability under the same evidence
 - Attribution: know **what** changed, not just **that** something changed
 
 ---
@@ -256,7 +254,7 @@ That's what makes **control possible**.
 
 ## Phase 3 Core Question
 
-> **Which representation supports monitoring, attribution, and uncertainty-aware control?**
+> **Which representation supports monitoring and attribution for persistent semantic state?**
 
 We evaluate along four axes:
 
@@ -294,13 +292,12 @@ We evaluate along four axes:
 
 **This is the key differentiator.**
 
-**Why it matters for autonomous systems:**
+**Why it matters for systems requiring persistent semantic state:**
 
-An autonomous system needs to answer:
+Such a system needs to answer:
 - "What do I currently believe about this venue?"
 - "What changed since my last observation?"
 - "Which specific aspect changed?"
-- "Should I seek more information?"
 
 **Dense embeddings cannot answer these questions.** You only see `||B_t - B_{t-1}|| = 0.15`. Was it service? Coffee? Ambiance? Unknown.
 
@@ -580,37 +577,36 @@ This is the **attribution/localization** difference we want to demonstrate.
 - Histogram plot: gentags vs embeddings localization distribution
 - 2-3 qualitative examples showing facet-level attribution
 
-### Dimension 3: Cold-Start / Uncertainty Behavior
+### Dimension 3: Cold-Start / Evidence-Sensitive Dispersion
 
 **Question:** How do representations behave when evidence is sparse?
 
-**Why it matters for autonomous systems:**
+**Why it matters for systems requiring persistent semantic state:**
 
-An autonomous system encountering a new venue with only 1-2 reviews must:
-- Form an initial belief state
-- Know how confident that belief is
-- Decide whether to seek more information
+A system encountering a new venue with only 1-2 reviews must:
+- Form an initial semantic state
+- Evaluate how stable that state is under repeated observation
 
 **The key difference:**
 
 | System | Sparse Data Behavior |
 |--------|---------------------|
-| Raw text | Works, but no confidence signal |
-| Embeddings | Produces a vector, but **no uncertainty signal** |
-| Model-in-the-loop | Can say "I'm uncertain" per-query, but **no persistent state** |
-| **Gentags** | High variance across extractions = **explicit uncertainty signal** |
+| Raw text | Works, but no identifiability signal |
+| Embeddings | Produces a vector, but **no identifiability signal** |
+| Model-in-the-loop | Can produce per-query answers, but **no persistent state** |
+| **Gentags** | Higher dispersion under sparse evidence |
 
 **Approach:**
 - Use S4 sparsity results from Phase 2 (correlation = -0.230)
-- Show: variability increases with sparse data
-- This variability IS the uncertainty signal
+- Show: dispersion increases with sparse data
+- Interpret as weaker evidence constraints on representation
 
-**Control implication:**
-- Low variance → high confidence → act
-- High variance → low confidence → seek more information
+**Downstream implication:**
+- Low dispersion → more stable representations under the same evidence
+- High dispersion → less stable representations under the same evidence
 
 **Metrics:**
-- Variability at different sparsity levels
+- Dispersion at different sparsity levels
 - Retention at different sparsity levels
 - Stability at different sparsity levels
 
@@ -703,7 +699,7 @@ An autonomous system encountering a new venue with only 1-2 reviews must:
 
 2. **Change Attribution:** When evidence changes, gentags show **what** changed (which facets). Embeddings only show **that** something changed (scalar distance).
 
-3. **Uncertainty Signal:** Gentag variance across extractions provides an uncertainty proxy. High variance = low confidence = seek more information.
+3. **Identifiability Signal:** Dispersion across extractions indicates how consistently the representation collapses under the same evidence.
 
 4. **Persistent State:** Unlike model-in-the-loop, gentags provide persistent belief state that enables monitoring, drift detection, and process control.
 
@@ -720,7 +716,7 @@ An autonomous system encountering a new venue with only 1-2 reviews must:
 **Use:**
 > "Dense embeddings encode meaning in a distributed manner, making it difficult to attribute representational change to specific semantic factors. Gentags provide an explicit factorized representation, enabling localized analysis of semantic drift."
 
-> "For autonomous decision systems, state observability is critical. Gentags externalize semantic belief as discrete, inspectable variables, supporting monitoring, attribution, and uncertainty-aware control."
+> "For autonomous decision systems, state observability is critical. Gentags externalize semantic belief as discrete, inspectable variables, supporting monitoring and attribution."
 
 **Avoid:**
 - "Embeddings are bad"

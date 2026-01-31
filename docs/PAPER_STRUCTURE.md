@@ -11,7 +11,7 @@ A **systems + representation paper** showing:
 
 1. LLMs can externalize latent semantics as discrete, inspectable tags
 2. These representations are semantically stable despite lexical variation
-3. Variability correlates with evidence sparsity (uncertainty signal)
+3. Variability correlates with evidence sparsity (dispersion/identifiability signal)
 4. Multiple models agree on extracted semantics
 
 **This is already publishable.** No pdensity required.
@@ -41,10 +41,10 @@ A **systems + representation paper** showing:
    - Gap of 0.504 between cosine (0.977) and Jaccard (0.471)
    - Proves surface variation ≠ semantic variation
 
-3. **Evidence-Sensitive Variability** — The S4 result
-   - Correlation = -0.230 (negative)
-   - More evidence → less variability
-   - Representation variability as proxy for epistemic insufficiency
+3. **Evidence-Induced Underconstraint** — The S4 result
+   - Limited evidence weakly constrains the representation
+   - Observable as dispersion across observer samples (correlation = -0.230)
+   - Runs are measurement, not mechanism
 
 ### Tier 2: Supporting Evidence (Strengthens the Paper)
 
@@ -78,7 +78,7 @@ A **systems + representation paper** showing:
 ## Paper Outline
 
 ### Abstract
-LLMs can produce stable, compressed semantic representations (gentags) that behave like folksonomies under perturbation. We show these representations are lexically variable but semantically stable, and that representation variability correlates with evidence sparsity—providing a proxy for epistemic insufficiency. We introduce propositional density (pdensity) as an explanatory construct for understanding semantic constraint strength.
+LLMs can produce stable, compact semantic representations (gentags) that behave like folksonomies under perturbation. We show these representations are lexically variable but semantically stable, agree across models and prompts, and preserve source meaning. Limited evidence weakly constrains representations, observable as dispersion across independent observer samples (OTags); repeated extractions are used solely to evaluate identifiability, not as a runtime loop. We further probe how representational structure affects downstream behavior using diagnostic semantic probes. We introduce propositional density (pdensity) as an interpretive construct for understanding semantic constraint strength.
 
 ### 1. Introduction
 - Problem: How to represent venue semantics for systems requiring persistent semantic state?
@@ -110,10 +110,10 @@ LLMs can produce stable, compressed semantic representations (gentags) that beha
 - Cross-model comparison
 - Result: Style varies, meaning stable
 
-#### 4.3 Variability and Evidence Sparsity (Phase 2 - S4)
-- Token count vs. variability correlation
-- Result: -0.230 (negative)
-- Interpretation: Representation variability as proxy for epistemic insufficiency
+#### 4.3 Evidence-Induced Underconstraint (Phase 2 - S4)
+- Limited evidence produces weakly constrained representations
+- Observable as dispersion across observer samples (r = -0.230)
+- Multiple extractions are measurement instrumentation, not the system itself
 
 #### 4.4 Retention Analysis
 - Comparison to random baseline
@@ -126,6 +126,16 @@ LLMs can produce stable, compressed semantic representations (gentags) that beha
 - Model-in-the-loop: no persistent state (31.6% stability)
 - Note: Facets introduced solely for evaluation, not part of gentag representation
 
+#### 4.6 Representation Coverage & Dispersion (Phase 4A)
+- Define coverage and dispersion as descriptive properties of observed gentag state
+- Multiple extractions used solely as offline measurement tool, not part of deployed system
+
+#### 4.7 Downstream Sensitivity (Phase 4B)
+- 5 synthetic semantic constraint bundles as diagnostic probes
+- Ranking stability comparison (Kendall τ across OTag snapshots)
+- Attribution analysis (which tags matched which probe terms)
+- Failure mode examples (missing concepts, spurious matches, dispersion propagation)
+
 ### 5. Discussion
 - Implications for systems requiring persistent semantic state
 - State observability for downstream decision systems
@@ -134,8 +144,8 @@ LLMs can produce stable, compressed semantic representations (gentags) that beha
 
 ### 6. Conclusion
 - Gentags are a valid semantic representation
-- Variability is signal, not noise
-- Future: Control applications, pdensity exploration
+- Weak evidence produces underconstrained representations (observable via dispersion)
+- Future: Control applications, pdensity exploration, PTags
 
 ### Appendix (Optional)
 - A. Propositional Density: Exploratory Analysis
@@ -152,7 +162,7 @@ LLMs can produce stable, compressed semantic representations (gentags) that beha
 | Semantic stability (S1) | ✅ | Phase 2 |
 | Prompt sensitivity (S2) | ✅ | Phase 2 |
 | Model sensitivity (S3) | ✅ | Phase 2 |
-| Sparsity/uncertainty (S4) | ✅ | Phase 2 |
+| Sparsity/dispersion (S4) | ✅ | Phase 2 |
 | Retention analysis | ✅ | Phase 2 |
 | Stability report | ✅ | Phase 2 |
 | All plots | ✅ | Phase 2 |
@@ -160,6 +170,8 @@ LLMs can produce stable, compressed semantic representations (gentags) that beha
 | **Cost comparison (Block H)** | ✅ | Phase 3 |
 | **Cold-start (Block I)** | ✅ | Phase 3 |
 | **Model-in-loop baseline** | ✅ | Phase 3 |
+| **Representation coverage & dispersion (4A)** | 🔜 | Phase 4 |
+| **Downstream sensitivity (4B)** | 🔜 | Phase 4 |
 | pdensity (exploratory) | 🔮 | Future |
 
 ### Phase 3 Key Results
@@ -228,7 +240,7 @@ This disarms reviewers. They can't attack what you explicitly position as interp
 
 ### Strong (Defensible)
 - "Gentags are lexically variable but semantically stable"
-- "Representation variability correlates with evidence sparsity"
+- "Limited evidence produces underconstrained representations (observable as dispersion)"
 - "Multiple LLMs produce semantically similar gentags"
 - "Gentags preserve review meaning better than random"
 - "Model-in-the-loop systems are unstable across repeated queries"
@@ -240,10 +252,10 @@ This disarms reviewers. They can't attack what you explicitly position as interp
 
 ### Interpretive (Explicitly Flagged)
 - "pdensity is an interpretive construct for semantic constraint strength"
-- "Representation variability serves as a proxy for epistemic insufficiency"
+- "Dispersion across observer samples reveals evidence-induced underconstraint"
 
 ### NOT Claimed (Important)
-- ❌ Calibrated uncertainty estimation
+- ❌ Calibrated probabilistic estimation
 - ❌ Bayesian posteriors
 - ❌ Decision-making policies
 - ❌ Control loops or action selection
@@ -258,22 +270,23 @@ This disarms reviewers. They can't attack what you explicitly position as interp
 The paper is publishable with:
 1. Gentags (new primitive)
 2. Semantic stability (key claim)
-3. Evidence-sensitive variability (S4)
+3. Evidence-induced underconstraint (S4 — weak evidence → loose representations)
 4. Localized change attribution (Phase 3)
+5. Representation coverage + downstream sensitivity (Phase 4)
 
 **The Core Claim (Correct Framing):**
 
-> Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive variability, which dense embeddings and model-in-the-loop architectures cannot provide.
+> Gentags provide a factorized, persistent semantic representation that enables localized change attribution. Limited evidence weakly constrains representations, observable as dispersion — a signal dense embeddings and model-in-the-loop architectures cannot provide.
 
 **What We Show:**
 - Semantic stability
 - Localized drift
 - Persistent state
-- Evidence-sensitive variability
+- Evidence-induced underconstraint (observable via dispersion)
 - Cost efficiency
 
 **Together:** Gentags act as an **observable semantic state layer** for downstream systems.
 
-**NOT:** Full decision-making, full uncertainty quantification, full control. Those come later.
+**NOT:** Full decision-making, full probabilistic quantification, full control. Those come later.
 
 pdensity is an interpretive construct—powerful for narrative, not required for validity.

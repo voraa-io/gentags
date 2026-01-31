@@ -22,7 +22,7 @@ This report presents the complete stability analysis of machine-generated semant
 | Retention delta vs random | **+0.164** | > 0.1 | ✅ |
 | S4 token-variability correlation | **-0.230** | < 0 | ✅ |
 
-**Interpretation:** Different LLM runs produce different words but the same meaning. Representation variability correlates with evidence sparsity, serving as a proxy for epistemic insufficiency.
+**Interpretation:** Different LLM runs produce different words but the same meaning. Representation variability correlates with evidence sparsity, indicating lower identifiability under the same evidence.
 
 ---
 
@@ -194,7 +194,7 @@ The negative correlation confirms:
 - **More evidence (tokens) → less variability**
 - **Less evidence → more variability**
 
-This shows variability serves as a **proxy for epistemic insufficiency**, not noise. When representations vary across runs/models, it indicates less constrained semantics — a venue with sparse reviews has weaker semantic grounding.
+This shows variability indicates **lower identifiability**, not noise. When representations vary across runs/models, the evidence weakly constrains the semantic state — sparse venues have weaker grounding.
 
 ![Sparsity Analysis](../results/phase2/plots/7_sparsity_analysis.png)
 
@@ -266,7 +266,7 @@ Evidence:
 Evidence:
 1. **S4 correlation = -0.230** (negative)
 2. More evidence → less variability
-3. Variability as proxy for epistemic insufficiency
+3. Variability as evidence-sensitive dispersion (identifiability)
 
 ### Models Share Semantics
 
@@ -309,7 +309,7 @@ Evidence:
 - `results/phase2/tables/prompt_sensitivity.csv`
 - `results/phase2/tables/model_sensitivity.csv`
 - `results/phase2/tables/retention.csv`
-- `results/phase2/tables/uncertainty_dispersion.csv`
+- `results/phase2/tables/uncertainty_dispersion.csv` (dispersion table; filename retained)
 - `results/phase2/tables/sparsity_analysis.csv`
 
 ### Plots

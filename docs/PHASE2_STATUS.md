@@ -76,7 +76,7 @@ Phase 2 semantic stability analysis is **largely complete**. The key claim has b
 
 **Tables:** `results/phase2/tables/retention.csv`
 
-### Uncertainty Dispersion ✅
+### Dispersion (Identifiability) ✅
 
 **Question:** What is the structure of variability across extractions?
 
@@ -85,7 +85,7 @@ Phase 2 semantic stability analysis is **largely complete**. The key claim has b
 - Mean pairwise distance: 0.051
 - Within-run, prompt, and model variance decomposition available
 
-**Tables:** `results/phase2/tables/uncertainty_dispersion.csv`
+**Tables:** `results/phase2/tables/uncertainty_dispersion.csv` (dispersion table; filename retained)
 
 ### Plots Generated ✅
 
@@ -114,7 +114,7 @@ All 6 required plots have been generated:
 | Mean tokens per venue | ~400 | Moderate evidence |
 | Mean variability | 0.051 | Low overall variability |
 
-**Conclusion:** Variability is an **uncertainty signal**, not noise. Venues with less textual evidence show more representation variability — exactly what we'd expect if variability reflects information need.
+**Conclusion:** Variability indicates **lower identifiability** under sparse evidence, not noise. Venues with less textual evidence show more representation variability — evidence weakly constrains the semantic state.
 
 **Tables:** `results/phase2/tables/sparsity_analysis.csv`
 **Plot:** `results/phase2/plots/7_sparsity_analysis.png`
@@ -161,14 +161,14 @@ Different prompts produce different numbers of tags and different phrasings, but
 
 ### 4. Variability is Interpretable
 
-When gentag representations vary across runs/prompts/models, this can be interpreted as uncertainty — a feature, not a bug.
+When gentag representations vary across runs/prompts/models, this reflects lower identifiability — a feature of sparse evidence, not a bug.
 
 ---
 
 ## File Inventory
 
 ### Scripts
-- `scripts/phase2_analysis.py` — Main analysis (S1-S3, retention, uncertainty)
+- `scripts/phase2_analysis.py` — Main analysis (S1-S3, retention, dispersion)
 - `scripts/phase2_plots.py` — Plot generation
 
 ### Results
@@ -183,7 +183,7 @@ results/phase2/
 │   ├── model_sensitivity_summary.csv
 │   ├── retention.csv               # Retention analysis
 │   ├── compression_summary.csv     # Cost-effectiveness
-│   ├── uncertainty_dispersion.csv  # Per-venue variability
+│   ├── uncertainty_dispersion.csv  # Per-venue dispersion (filename retained)
 │   └── sparsity_analysis.csv       # S4 results
 ├── plots/
 │   ├── 1_run_stability.png

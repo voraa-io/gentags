@@ -72,14 +72,14 @@ If we can show the gap between surface variation and semantic stability, we prov
 - Core semantic dimensions overlap strongly
 - No single "best" model — they're different lenses on the same meaning
 
-### S4: Stability Under Sparsity (less evidence → more uncertainty)
+### S4: Stability Under Sparsity (less evidence → more dispersion)
 
 **Question:** As textual evidence decreases, does representation variability increase?
 
 **Why it matters:**
-- This is the uncertainty signal — variability should increase with less evidence
-- High variability = low confidence = information need
-- This is NOT noise — it's a feature that exposes where more data is needed
+- Dispersion should increase with less evidence
+- Higher dispersion indicates lower identifiability under the same evidence
+- This is NOT noise — it's a descriptive property of sparse evidence
 
 **Original approach (problematic):**
 - Subsample reviews (5, 3, 1 per venue)
@@ -98,9 +98,9 @@ If we can show the gap between surface variation and semantic stability, we prov
 - Token count captures actual information content
 
 **Expected outcome:**
-- Low token venues → higher within-venue variability (more uncertainty)
+- Low token venues → higher within-venue variability (lower identifiability)
 - High token venues → lower variability (more constrained representation)
-- Variability is interpretable as uncertainty, not error
+- Variability is interpretable as dispersion under sparse evidence, not error
 
 **Data already exists (no new extractions needed):**
 ```
@@ -123,7 +123,7 @@ results/phase2/tables/
 # 3. Correlation between tokens and variability
 
 # Expected correlation: negative (more tokens → less variability)
-# This proves variability is uncertainty signal, not noise
+# This shows dispersion reflects identifiability under sparse evidence, not noise
 ```
 
 ---
@@ -166,7 +166,7 @@ KEY CLAIM: Lexically unstable but semantically stable
 Retention - Mean: 0.625
 Retention - Mean delta (vs random): 0.164
 Redundancy - Mean rate: 0.001
-Uncertainty - Mean pairwise distance: 0.051
+Dispersion - Mean pairwise distance: 0.051
 
 ✅ All success checks passed
 ```

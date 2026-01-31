@@ -12,7 +12,7 @@ Phase 3 evaluates gentags against alternative representations for **systems requ
 
 ### Key Finding
 
-> **Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive variability, which dense embeddings and model-in-the-loop architectures cannot provide.**
+> **Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive dispersion, which dense embeddings and model-in-the-loop architectures cannot provide.**
 
 | Metric | Gentags | Embeddings | Model-in-Loop |
 |--------|---------|------------|---------------|
@@ -74,7 +74,7 @@ Before diving into results, let's clarify what "model-in-the-loop" means, as thi
 |------------|---------------|---------|
 | "Is venue quiet?" | LLM call (all reviews) | Check `"quiet" ∈ tags` |
 | "What changed since yesterday?" | **Impossible** (no prior state) | Diff tag sets |
-| "Which aspects show high variability?" | **Impossible** | Check tag variance |
+| "Which aspects show high dispersion?" | **Impossible** | Check tag variance |
 | 100 questions about same venue | 100 LLM calls | 100 tag lookups |
 | Detect semantic drift over time | **Impossible** | Compare tag snapshots |
 
@@ -249,7 +249,7 @@ For systems that continuously monitor and query semantic state, gentags are dram
 
 ---
 
-## Block I: Cold-Start / Evidence-Sensitive Variability
+## Block I: Cold-Start / Evidence-Sensitive Dispersion
 
 ### The Question
 
@@ -257,21 +257,18 @@ For systems that continuously monitor and query semantic state, gentags are dram
 
 ### Why This Matters
 
-A venue with only 1-2 reviews has inherently limited semantic grounding. A downstream system may need to:
-1. Recognize epistemic insufficiency
-2. Flag for additional information gathering
-3. Weight decisions accordingly
+A venue with only 1-2 reviews has inherently limited semantic grounding. We report how representation dispersion changes as evidence increases.
 
-**Gentags provide a variability signal:** High variance across extractions serves as a proxy for epistemic insufficiency.
+**Gentags provide a dispersion signal:** Higher variance across extractions indicates lower identifiability under the same evidence.
 
-**Important:** We do NOT claim calibrated uncertainty estimation or Bayesian posteriors. We show that representation variability correlates with evidence sparsity—an interpretable signal, not a probability.
+**Important:** We do NOT claim calibrated probabilistic estimation or Bayesian posteriors. We show that representation dispersion correlates with evidence sparsity—an interpretable descriptive signal, not a probability.
 
 ### Results
 
 | Metric | Value |
 |--------|-------|
 | Token-variability correlation | **-0.230** |
-| Interpretation | More evidence → less variability |
+| Interpretation | More evidence → lower dispersion |
 
 ### By Evidence Level
 
@@ -291,8 +288,8 @@ Sparse venues show ~2x the variability of low-evidence venues.
 **Right panel:** Box plot by evidence level confirms sparse venues have higher representation variability.
 
 **Downstream implication:**
-- Low variability → more constrained semantics → higher confidence for downstream systems
-- High variability → less constrained semantics → signal for information-seeking
+- Low variability → more stable representations under the same evidence
+- High variability → less stable representations under the same evidence
 
 ---
 
@@ -393,13 +390,13 @@ Model-in-the-loop cannot serve as a stable semantic state representation because
 
 ### Key Claim Validated
 
-> **Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive variability, which dense embeddings and model-in-the-loop architectures cannot provide.**
+> **Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive dispersion, which dense embeddings and model-in-the-loop architectures cannot provide.**
 
 Evidence:
 1. **Localization:** Gini 0.657 vs 0.361 (p < 0.001)
 2. **Stability:** 97.7% semantic stability (Phase 2)
 3. **Attribution:** Per-facet change tracking
-4. **Evidence-sensitive variability:** Correlation -0.230 (more evidence → less variability)
+4. **Evidence-sensitive dispersion:** Correlation -0.230 (more evidence → less variability)
 
 ### What Gentags Provide That Alternatives Don't
 
@@ -421,7 +418,7 @@ This is what enables state observability for downstream decision systems.
 
 ### What We Do NOT Claim
 
-- ❌ Calibrated uncertainty estimation
+- ❌ Calibrated probabilistic estimation
 - ❌ Bayesian posteriors
 - ❌ Decision-making policies
 - ❌ Control loops or action selection
@@ -538,12 +535,12 @@ Phase 3 builds on Phase 2 findings:
 | Phase 2 Finding | Phase 3 Extension |
 |-----------------|-------------------|
 | Semantic stability (0.977) | Compared to model-in-loop (0.316) |
-| Variability correlation (-0.230) | Evidence-sensitive variability as proxy for epistemic insufficiency |
+| Variability correlation (-0.230) | Evidence-sensitive dispersion (identifiability under sparse evidence) |
 | Lexical ≠ semantic gap (0.504) | Enables per-facet attribution |
 
 Together, Phases 2 and 3 establish that gentags are:
 1. **Semantically stable** (Phase 2)
-2. **Evidence-sensitive** (Phase 2, S4 — variability correlates with sparsity)
+2. **Evidence-sensitive** (Phase 2, S4 — dispersion correlates with sparsity)
 3. **Localized/attributable** (Phase 3)
 4. **Persistent** (Phase 3)
 5. **Cost-effective** (Phase 3)

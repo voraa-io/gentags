@@ -172,7 +172,9 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 |-------|-------------|--------|
 | Phase 1 | Extraction pipeline & multi-model runs | ✅ Complete |
 | Phase 2 | Semantic stability analysis | ✅ Complete |
-| Phase 3 | Baseline comparison & localization | ✅ Complete |
+| Phase 3 | Representation comparison & localization | ✅ Complete |
+| Phase 3A | Classical baseline comparison (TF-IDF, RAKE, YAKE) | ✅ Complete |
+| Phase 4 | Downstream sensitivity analysis | 🔜 Planning |
 
 ### Core Contributions (Validated)
 
@@ -181,6 +183,7 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 3. **Evidence-Sensitive Variability** — Correlation with evidence sparsity (-0.230)
 4. **Model Agreement** — 4 different LLMs produce semantically similar outputs
 5. **State Observability** — Gentags enable localized change attribution (Gini = 0.657 vs 0.361)
+6. **Classical Baseline Comparison** — Gentags beat TF-IDF/RAKE/YAKE on localization (5x higher Gini)
 
 ### Key Results
 
@@ -189,15 +192,15 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 | Cosine (semantic) | 0.977 | High semantic stability |
 | Jaccard (surface) | 0.471 | Expected lexical variation |
 | Gap | 0.504 | Proves lexical ≠ semantic |
-| S4 correlation | -0.230 | More evidence → less variability |
+| S4 correlation | -0.230 | More evidence → lower dispersion |
 | Retention delta | +0.164 | Gentags capture meaning |
 | Gentag Gini | 0.657 | Localized change attribution |
 | Embedding Gini | 0.361 | Diffuse (not attributable) |
+| Classical Baseline Gini | 0.12 | Very diffuse (no attribution) |
 | Model-in-loop stability | 31.6% | No persistent state (unstable) |
 
-See `docs/PAPER_STRUCTURE.md` for full paper outline and contribution hierarchy.
-See `docs/STABILITY_ANALYSIS_REPORT.md` for detailed Phase 2 results.
-See `docs/PHASE3_ANALYSIS_REPORT.md` for detailed Phase 3 results.
+See `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` for **complete analysis across all phases**.
+See `docs/PAPER_STRUCTURE.md` for paper outline and contribution hierarchy.
 
 ---
 
@@ -205,11 +208,15 @@ See `docs/PHASE3_ANALYSIS_REPORT.md` for detailed Phase 3 results.
 
 | Document | Description |
 |----------|-------------|
+| `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` | **Comprehensive report: all phases combined** |
 | `docs/PAPER_STRUCTURE.md` | Paper outline and contribution hierarchy |
 | `docs/STABILITY_ANALYSIS_REPORT.md` | Full Phase 2 results with plots |
 | `docs/PHASE3_ANALYSIS_REPORT.md` | Full Phase 3 results with plots |
+| `docs/PHASE3A_ANALYSIS_REPORT.md` | Classical baseline comparison (TF-IDF, RAKE, YAKE) |
+| `docs/PHASE3A_PLAN.md` | Phase 3A methodology and implementation |
 | `docs/PHASE2_STATUS.md` | Phase 2 completion status |
 | `docs/PHASE3_PLAN.md` | Phase 3 methodology and implementation details |
+| `docs/PHASE4_PLAN.md` | Phase 4 plan: downstream sensitivity analysis |
 | `docs/STUDY1_LOCK.md` | Frozen methodology |
 
 ---

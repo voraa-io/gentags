@@ -13,7 +13,7 @@ The study evaluates:
 - Cross-model agreement
 - Prompt sensitivity
 - Run-to-run stability
-- Semantic coverage and variability
+- Semantic coverage and dispersion
 
 The study does **not** evaluate downstream recommendation accuracy or user behavior.
 
@@ -58,7 +58,7 @@ Gentags are designed to function as:
 
 - A folksonomy-like semantic layer (emergent, interpretable, non-ontological)
 - Human-readable semantic metadata
-- Embed-friendly units for downstream retrieval
+- Embed-friendly units for downstream matching and filtering
 
 Gentags are **not** ratings, sentiment labels, categories, or ontology-aligned attributes.
 
@@ -117,7 +117,7 @@ For each venue, gentags were extracted using all combinations of:
 - Prompt
 - Run number
 
-Each configuration was executed multiple times to measure run-to-run variability.
+Each configuration was executed multiple times to measure run-to-run dispersion.
 
 ### 6.1 Output Parsing
 
@@ -168,7 +168,7 @@ Study 1 evaluates gentags using the following metrics:
 ### 9.1 Stability
 
 - Run-to-run Jaccard similarity
-- Within-model variability
+- Within-model dispersion
 
 ### 9.2 Model Agreement
 
