@@ -170,13 +170,11 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 
 | Section | Description | Status |
 |---------|-------------|--------|
-| Motivation | LLMs cannot serve as persistent state (31.6% stability) | ✅ Complete |
+| Motivation | Persistent, addressable semantic state | ✅ Complete |
 | Phase 1 | Extraction pipeline & multi-model runs | ✅ Complete |
 | Phase 2 | Semantic stability analysis | ✅ Complete |
-| §3.1 Localization | Gentags localize drift (1.50× vs embeddings) | ✅ Complete |
-| §3.2 Baselines | Classical methods retain words, not state | ✅ Complete |
-| §3.3 Boundaries | Paraphrase sensitivity (negative result) | ✅ Complete |
-| Phase 4 | Probe sensitivity (pdensity validation) | 🔜 Planning |
+| Phase 3 | Structural proof (State-Gini) + Utility proof (DIR/INV) | 🔜 Planned |
+| Phase 4 | Downstream probes | 🔜 Planning |
 
 ### Core Thesis
 
@@ -184,20 +182,27 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 
 ### Claims
 
-| Claim | Evidence | Implication |
-|-------|----------|-------------|
-| LLMs lack persistent state | 31.6% stability | Must externalize semantic state |
-| Gentags localize drift | 1.50× Gini vs embeddings | Inspect ~2-3 tags, not 3072 dims |
-| Keywords retain words, not state | RAKE 0.742 retention but deterministic | Gentags trade overlap for distillation |
-| Gentags are surface-sensitive | MMC 0.648 < 0.80 | Hybrid representation (semantic + lexical) |
+| Claim (Phase 2 validated) | Evidence | Implication |
+|--------------------------|----------|-------------|
+| Gentags are semantically stable | Cosine 0.977 | Representation can serve as state |
+| Gentags vary lexically | Jaccard 0.471 | Stability is semantic, not surface |
+| Evidence-sensitive dispersion | r = -0.230 | Less evidence → less identifiability |
+| Retention above random | +0.164 | Tags preserve source meaning |
+
+### Planned Phase 3 Tests
+
+- Structural proof: State-Gini factorization (gentags vs RAKE/TF-IDF/YAKE)
+- Utility proof: CheckList DIR/INV interventions (gentags vs embeddings)
 
 ### Key Numbers
 
-| Metric | Value |
-|--------|-------|
-| Model-in-the-loop stability | 31.6% |
+| Metric (Phase 2) | Value |
+|------------------|-------|
 | Semantic stability (cosine) | 0.977 |
-| Localization Gini (gentags) | 0.553 |
+| Surface variation (Jaccard) | 0.471 |
+| Semantic gap (cosine - Jaccard) | 0.504 |
+| Retention above random | +0.164 |
+| Evidence-variability correlation | -0.230 |
 | Localization Gini (embeddings) | 0.369 |
 | **Localization advantage** | **1.50×** |
 | Paraphrase MMC | 0.648 |
