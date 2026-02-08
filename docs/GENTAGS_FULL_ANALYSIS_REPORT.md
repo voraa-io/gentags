@@ -1,7 +1,7 @@
 # Gentags: Full Analysis Report
 
-**Date:** 2026-01-30
-**Status:** Complete (Phases 2, 3, 3A)
+**Date:** 2026-01-30 (Updated: 2026-02-07)
+**Status:** In progress (Phase 2 complete; Phase 3 redefined)
 **Purpose:** Consolidated analysis for paper preparation
 
 ---
@@ -12,7 +12,7 @@ This report documents the complete empirical validation of **gentags** — machi
 
 ### The Core Claim
 
-> **Gentags are a persistent semantic representation that is compact, inspectable, localizes change, preserves meaning, and is cheaper than repeated inference.**
+> **Gentags are a persistent semantic representation that is compact, inspectable, and preserves meaning.**
 
 ### Key Metrics at a Glance
 
@@ -23,24 +23,18 @@ This report documents the complete empirical validation of **gentags** — machi
 | Semantic gap (cosine - Jaccard) | **0.504** | > 0.3 | ✅ |
 | Retention above random | **+0.164** | > 0.1 | ✅ |
 | Evidence-variability correlation | **-0.230** | < 0 | ✅ |
-| Localization Gini (gentags) | **0.657** | > 0.5 | ✅ |
-| Localization Gini (embeddings) | **0.361** | < 0.5 | ✅ |
-| Localization Gini (classical baselines) | **0.12** | < gentags | ✅ |
-| Model-in-loop stability | **31.6%** | — | baseline |
-| % gentag more localized than embedding | **90.1%** | > 80% | ✅ |
 
-### Falsification Criteria (All Passed)
+**Phase 3 (planned):** State-Gini structural proof + DIR/INV utility proof.
 
-Gentags would fail if any of these broke. All passed:
+### Falsification Criteria
+
+Gentags would fail if any of these broke:
 
 | Criterion | Threshold | Actual | Status |
 |-----------|-----------|--------|--------|
 | Semantic cosine < embedding baseline | < 0.9 | **0.977** | ✅ PASS |
-| Localization Gini ≈ embeddings | < 0.1 diff | **+0.296** | ✅ PASS |
-| Localization Gini ≤ classical baselines | ≤ 0.15 | **0.657** | ✅ PASS |
 | Variability does NOT decrease with evidence | r ≥ 0 | **-0.230** | ✅ PASS |
 | Model agreement collapses | < 0.9 | **>0.94** | ✅ PASS |
-| Attribution examples meaningless | subjective | **meaningful** | ✅ PASS |
 
 ---
 
@@ -52,8 +46,7 @@ A **representation + characterization paper** showing:
 2. These representations are semantically stable despite lexical variation
 3. Dispersion correlates with evidence sparsity (identifiability signal)
 4. Multiple models agree on extracted semantics
-5. Gentags enable localized change attribution
-6. Model-in-the-loop lacks persistent state (31.6% stability)
+5. Phase 3 will test **structure (State-Gini)** and **utility (DIR/INV)** (planned)
 
 ### What This Paper is NOT
 
@@ -61,7 +54,12 @@ A **representation + characterization paper** showing:
 - ❌ A recommender systems paper
 - ❌ A user study paper
 - ❌ An uncertainty quantification paper
+- ❌ A belief-state or probabilistic state-estimation paper
 - ❌ A control/agent paper
+
+**Terminology note:** In this paper, **semantic state** means a set of discrete, evidence-conditioned
+semantic propositions (gentags). It is **not** a probabilistic belief state: we do not model
+uncertainty, belief updates, or control dynamics.
 
 ---
 
@@ -86,7 +84,7 @@ A **representation + characterization paper** showing:
 
 ### Models and Prompts
 
-**Models:** OpenAI GPT-4o, Gemini 1.5 Flash, Claude 3.5 Sonnet, Grok
+**Models:** OpenAI `gpt-5-nano`, Gemini `gemini-2.5-flash`, Claude `claude-sonnet-4-5`, Grok `grok-4`
 
 **Prompts:**
 - `anti_hallucination` — More tags, more grounded
@@ -223,198 +221,41 @@ Different model/prompt combinations offer different cost-quality tradeoffs.
 
 ---
 
-## Phase 3: Representation Comparison
+## Phase 3: Structure + Utility (Planned)
 
-Phase 3 compares gentags against two baselines:
-1. **Dense embeddings** — Same semantic content, but opaque
-2. **Model-in-the-loop** — No persistent state; fresh LLM call per query
+Phase 3 is a **two-part proof** executed independently:
+1. **Structural proof** (State-Gini) — the state is factorized.
+2. **Utility proof** (CheckList DIR/INV) — the state is actionable.
 
-### Block G: Localization / Change Attribution
+### Experiment A: Structural Proof (State-Gini)
 
-**Question:** When semantic state changes, can you tell *what* changed?
+**Goal:** Quantify factorization of gentag state.
 
-**Setup:**
-- Compare tag sets across run pairs
-- Compute per-facet drift (10 semantic facets, for evaluation only)
-- Measure concentration with Gini coefficient
+**Protocol:**
+- Hard-assign tags to 10 facets using cosine similarity with threshold τ=0.35
+- Compute Gini on facet counts
 
-**Results:**
+**Baselines:** RAKE / TF-IDF / YAKE (same facets + same τ)
 
-| Metric | Gentags | Embeddings |
-|--------|---------|------------|
-| **Mean Gini** | **0.657** | 0.361 |
-| Median Gini | 0.700 | 0.356 |
-| % gentag > embedding | **90.1%** | — |
-| Wilcoxon p-value | **< 0.001** | — |
-
-**Interpretation:** Gentags show localized change (high Gini). Embeddings show diffuse change (low Gini). In 90.1% of cases, gentags were more localized.
-
-![Localization Comparison](../results/phase3/plots/1_localization_comparison.png)
-
-#### Why This Matters
-
-**With embeddings:**
-```
-vector_t1 = [0.123, -0.456, 0.789, ...]
-vector_t2 = [0.131, -0.449, 0.795, ...]
-drift = 0.15
-```
-You know *something* changed. But what?
-
-**With gentags:**
-```
-tags_t1 = {"great coffee", "friendly staff", "quiet"}
-tags_t2 = {"great coffee", "slow service", "crowded"}
-
-Changes:
-  - "friendly staff" → REMOVED
-  + "slow service"   → ADDED
-  - "quiet" → REMOVED
-  + "crowded" → ADDED
-```
-Now you know *exactly* what changed.
-
-![Facet Drift](../results/phase3/plots/2_facet_drift.png)
+**Primary metrics:** State-Gini (gentags vs baselines)
 
 ---
 
-### Block H: Cost Comparison
+### Experiment B: Utility Proof (CheckList DIR/INV)
 
-**Question:** What is the cost-efficiency of each representation?
+**Goal:** Show targeted edits to gentag state predictably change downstream decisions.
 
-| Representation | Cost Type | When Incurred |
-|----------------|-----------|---------------|
-| Gentags | One-time extraction | Once per venue |
-| Embeddings | One-time encoding | Once per venue |
-| Model-in-loop | Per-query LLM call | Every question |
+**DIR:** Delete/flip a negative tag; score must move in expected direction.
 
-#### Cost Scaling
+**INV:** Paraphrase tags; score should remain within ε of baseline.
 
-| Queries/venue | Model-in-loop | Gentags |
-|---------------|---------------|---------|
-| 1 | $0.0006 | $0.005 (one-time) |
-| 10 | $0.0057 | $0.005 (one-time) |
-| 100 | $0.057 | $0.005 (one-time) |
-| 1,000 | $0.57 | $0.005 (one-time) |
+**Baseline:** Dense embeddings (`text-embedding-3-large`).
 
-**Break-even:** ~17 queries per venue.
-
-![Cost Comparison](../results/phase3/plots/3_cost_comparison.png)
+**Primary metrics:** DIR pass rate, INV pass rate, attribution precision.
 
 ---
 
-### Block I: Cold-Start / Evidence-Sensitive Dispersion
-
-**Question:** How do representations behave with sparse evidence?
-
-| Evidence Level | Mean Variability | N Venues |
-|----------------|------------------|----------|
-| Sparse (1-3 reviews) | 0.097 (highest) | 28 |
-| Low (4-5 reviews) | 0.047 | 202 |
-
-Sparse venues show ~2x the variability — an identifiability signal, not noise.
-
-![Cold Start](../results/phase3/plots/4_cold_start.png)
-
----
-
-### Model-in-the-Loop Stability
-
-**Question:** If you ask the same question twice, do you get the same answer?
-
-**Experiment:** 50 venues × 10 facets × 2 runs = 1,000 queries
-
-| Metric | Value |
-|--------|-------|
-| **Exact match rate** | **31.6%** |
-| No-info agreement | 95.0% |
-
-**Only 31.6% of responses matched exactly across runs.**
-
-#### Stability by Facet
-
-| Facet | Exact Match |
-|-------|-------------|
-| dietary | 85% (many "no info") |
-| portions | 52% |
-| food_quality | 8% |
-| service | 2% |
-| ambiance | 0% |
-
-Rich semantic facets are highly unstable. Model-in-the-loop cannot serve as persistent state.
-
-![Model-in-Loop Stability](../results/phase3/plots/5_model_in_loop_stability.png)
-
----
-
-### Summary Comparison
-
-| Dimension | Gentags | Embeddings | Model-in-Loop |
-|-----------|---------|------------|---------------|
-| Semantic Stability | ✅ 0.977 | ✅ 0.977 | ❌ 0.316 |
-| Change Localization | ✅ 0.657 | ❌ 0.361 | ❌ N/A |
-| Persistent State | ✅ Yes | ✅ Yes | ❌ No |
-| Cost Efficiency | ✅ O(1) | ✅ O(1) | ❌ O(n) |
-| Interpretable | ✅ Yes | ❌ No | ✅ Yes |
-| Attribution | ✅ Yes | ❌ No | ❌ No |
-
-![Summary Comparison](../results/phase3/plots/6_summary_comparison.png)
-
----
-
-## Phase 3A: Classical Baseline Comparison
-
-**Question:** Do classical keyword extraction methods (TF-IDF, RAKE, YAKE) achieve similar results?
-
-**Answer:** Classical methods achieve higher retention but **5x worse localization**.
-
-### Retention Comparison
-
-| Method | Mean Retention | Type |
-|--------|----------------|------|
-| RAKE | **0.742** | Statistical |
-| TF-IDF | 0.687 | Statistical |
-| YAKE | 0.677 | Statistical |
-| Gentags | 0.625 | LLM-based |
-
-**Finding:** RAKE beats gentags on retention by 0.117. Classical methods are optimized for lexical overlap with source text.
-
-### Localization (Gini) Comparison
-
-| Method | Mean Gini |
-|--------|-----------|
-| **Gentags** | **0.657** |
-| Embeddings | 0.361 |
-| YAKE | 0.129 |
-| TF-IDF | 0.125 |
-| RAKE | 0.120 |
-
-**Finding:** Gentags achieve **5x higher Gini** than classical baselines.
-
-### Interpretation
-
-**Classical methods:**
-- Extract surface tokens that correlate with source text
-- Produce diffuse, non-localizable representations
-- Cannot tell *what* changed when representation drifts
-
-**Gentags:**
-- Extract semantic concepts, not just surface tokens
-- Produce concentrated, attributable representations
-- Can trace changes to specific semantic facets
-
-### Decision Tree Outcome: **Case 2**
-
-| Metric | Result |
-|--------|--------|
-| Retention | Gentags lose (-0.117 vs RAKE) |
-| Localization | Gentags win (+0.528 vs best baseline) |
-
-**Contribution pivot:** Gentags are not about compression efficiency. They're about **attributable semantic state**.
-
-See `docs/PHASE3A_ANALYSIS_REPORT.md` for full details.
-
----
+**Status:** planned. No Phase 3 results are claimed in this report until executed.
 
 ## What We Claim (Strong, Defensible)
 
@@ -422,11 +263,8 @@ See `docs/PHASE3A_ANALYSIS_REPORT.md` for full details.
 - ✅ Limited evidence produces higher dispersion (identifiability signal)
 - ✅ Multiple LLMs produce semantically similar gentags
 - ✅ Gentags preserve review meaning better than random
-- ✅ Gentags enable localized change attribution
-- ✅ Dense embeddings exhibit diffuse, non-attributable drift
-- ✅ Model-in-the-loop is unstable across repeated queries (31.6%)
 - ✅ Gentags provide persistent semantic state
-- ✅ Gentags outperform classical baselines (TF-IDF, RAKE, YAKE) on localization (5x higher Gini)
+- ⚠️ Phase 3 structural + utility results are planned but not yet run
 
 ## What We Do NOT Claim
 
@@ -438,6 +276,14 @@ See `docs/PHASE3A_ANALYSIS_REPORT.md` for full details.
 - ❌ User behavior modeling
 - ❌ Recommender system
 
+## Future Work
+
+1. Belief & uncertainty: confidence on gentags, contradiction resolution, probabilistic gentags, fusion across sources
+2. Temporal dynamics: update rules, decay, drift handling, persistence policies over time
+3. Control & agents: action selection conditioned on gentag state, active querying, self-correction loops
+4. Quantitative gentags: numeric attributes, hybrid semantic + scalar tags, clinical variables
+5. Domain applications: medicine, monitoring, recommendation, safety
+
 ---
 
 ## The Bottom Line
@@ -447,28 +293,28 @@ See `docs/PHASE3A_ANALYSIS_REPORT.md` for full details.
 A **persistent semantic representation** that:
 - Is **compact** (few tags vs. thousands of words)
 - Is **inspectable** (read the tags)
-- **Localizes change** (diff tag sets → see what changed)
 - **Preserves meaning** (+0.164 above random)
-- Is **cheaper** than repeated inference
+- Is **consistent across models and prompts**
 
 ### What This Enables
 
 Gentags act as an **observable semantic state layer** for downstream systems:
-- Monitor semantic beliefs
-- Detect when beliefs change
-- Attribute changes to specific causes
-- Support downstream decision processes
+- Support monitoring and comparison workflows
+- Enable planned attribution and intervention analyses (Phase 3)
 
 ### Research Trajectory
 
 ```
 Paper 1 (THIS): Representation infrastructure
-                → Gentags as semantic state
+                → Gentags as semantic propositions
 
-Paper 2 (NEXT): Control / Information seeking
-                → OTags → PTags → Active queries
+Paper 2 (NEXT): Belief & uncertainty
+                → Confidence, contradiction, updating
 
-Paper 3 (FUTURE): Domain applications
+Paper 3 (FUTURE): Control & agents
+                  → Active querying, policies
+
+Paper 4 (FUTURE): Domain applications
                   → SPC, obstetrics, etc.
 ```
 
@@ -490,13 +336,13 @@ This is how representation research works. Word2vec didn't ship reinforcement le
 | Cosine | Semantic similarity in embedding space |
 | Jaccard | Surface overlap of normalized tag sets |
 | MMC | Mean Max Cosine — paraphrase detection |
-| Gini | Concentration of change (1 = localized, 0 = diffuse) |
+| Gini | Concentration of semantic state or change (higher = more localized) |
 | Retention | Cosine(review_embedding, tag_embedding) |
 
 ### Reproducibility
 - Fixed random seeds
 - All configurations logged in `phase2_manifest.json`
-- Scripts: `scripts/phase2_analysis.py`, `scripts/phase3_analysis.py`
+- Scripts: `scripts/phase2_analysis.py` (Phase 2), Phase 3 scripts pending redefinition
 
 ---
 
@@ -519,18 +365,18 @@ This is how representation research works. Word2vec didn't ship reinforcement le
 - `results/phase2/plots/7_sparsity_analysis.png`
 
 ### Phase 3 Tables
-- `results/phase3/tables/localization.csv`
-- `results/phase3/tables/cost_comparison.csv`
-- `results/phase3/tables/cold_start.csv`
-- `results/phase3/model_in_loop_stability.csv`
+Planned outputs (Phase 3 redefined; structural + utility):
+- `results/phase3/tables/state_gini_gentags.csv`
+- `results/phase3/tables/state_gini_baselines.csv`
+- `results/phase3/tables/state_gini_summary.csv`
+- `results/phase3/tables/dir_results.csv`
+- `results/phase3/tables/inv_results.csv`
+- `results/phase3/tables/dir_inv_summary.csv`
 
 ### Phase 3 Plots
-- `results/phase3/plots/1_localization_comparison.png`
-- `results/phase3/plots/2_facet_drift.png`
-- `results/phase3/plots/3_cost_comparison.png`
-- `results/phase3/plots/4_cold_start.png`
-- `results/phase3/plots/5_model_in_loop_stability.png`
-- `results/phase3/plots/6_summary_comparison.png`
+- `results/phase3/plots/state_gini_comparison.png`
+- `results/phase3/plots/dir_pass_rate.png`
+- `results/phase3/plots/inv_pass_rate.png`
 
 ---
 
@@ -553,5 +399,5 @@ Phase 4 will add:
 
 ---
 
-*Report generated: 2026-01-30*
+*Report generated: 2026-01-30 (Updated: 2026-02-07)*
 *Run ID: week2_run_20251223_191104*

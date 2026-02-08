@@ -1,8 +1,151 @@
 # Phase 3: Representation Comparison Analysis Report
 
-**Date:** 2026-01-25
-**Status:** Complete
+**Date:** 2026-01-25 (Updated: 2026-02-01)
+**Status:** Complete (Methodology Corrected)
 **Depends on:** Phase 2 (Stability Analysis) ✅
+
+---
+
+## Methodological Correction (2026-02-01)
+
+> **CRITICAL UPDATE:** The original anchor computation used tag averaging, which introduced circular reasoning. This has been corrected to use fixed descriptive phrases.
+
+### The Problem (Original)
+
+```python
+# INCORRECT (circular reasoning)
+def compute_anchor_embeddings(tag_embeddings):
+    for facet in FACETS:
+        facet_tags = [t for t in tags if assign_facet(t) == facet]
+        anchor_embeddings[facet] = mean_pool([tag_embeddings[t] for t in facet_tags])
+```
+
+**Issues:**
+1. **Circularity:** Using tags to define anchors, then measuring tag localization against those anchors
+2. **Noise:** Random vectors for facets with no tag coverage
+
+### The Fix (Current)
+
+```python
+# CORRECT (method-neutral)
+FACET_ANCHORS = {
+    "food_quality": "food quality, taste, freshness, delicious meals",
+    "ambiance": "atmosphere, ambiance, vibe, decor, cozy environment",
+    # ... 10 fixed phrases
+}
+
+def compute_anchor_embeddings_fixed(client):
+    return {facet: embed(text) for facet, text in FACET_ANCHORS.items()}
+```
+
+**Benefits:**
+1. **No circularity:** Anchors defined independently of any method's output
+2. **No noise:** Every facet has a meaningful embedding
+3. **Method-neutral:** Same yardstick for Gentags, Embeddings, RAKE, TF-IDF
+
+### Sensitivity Analysis: Three Evaluation Methods
+
+To ensure robust findings, we evaluate localization using **three methods**:
+
+| Method | Description | Gentag Gini | Embedding Gini | Advantage |
+|--------|-------------|-------------|----------------|-----------|
+| **1. Keyword-based** | Lexical matching (~50% filtered to "other") | 0.657 | 0.369 | 1.78x |
+| **2. Semantic Mean** | Mean similarity, no threshold (diffuse) | 0.358 | 0.369 | 0.97x |
+| **3. Semantic Threshold τ=0.35** | Hard assignment with threshold (**GOLD**) | **0.553** | 0.369 | **1.50x** |
+
+#### Key Insights
+
+1. **Keyword-based (0.657):** Highest Gini because ~50% of tags go to "other" bucket (not counted in drift). This is the "upper bound" but brittle to vocabulary mismatches.
+
+2. **Semantic Mean (0.358):** Lowest Gini because every tag contributes to every facet via soft assignment. This creates "semantic spillover" and diffuse profiles.
+
+3. **Semantic Threshold τ=0.35 (0.553):** The **GOLD STANDARD**. Tags below threshold go to "other" (41% filtered). This balances semantic flexibility with attributable state.
+
+#### The "Other" Bucket Insight
+
+| Method | % Tags to "Other" | Gentag Gini |
+|--------|-------------------|-------------|
+| Keyword | 49.6% | 0.657 |
+| Semantic τ=0.35 | 41.2% | 0.553 |
+| Semantic τ=0.00 | 0.0% | 0.358 |
+
+**Conclusion:** The "other" bucket acts as a **noise filter**. Tags that don't clearly map to our 10 diagnostic facets represent "out-of-ontology semantics." By excluding them, we measure only attributable state changes.
+
+### Reviewer Shield
+
+> "To ensure method-neutral evaluation, we report a sensitivity analysis across three evaluation regimes: (1) keyword-based lexical matching, (2) semantic mean projection, and (3) semantic threshold projection with τ=0.35. The gold standard (τ=0.35) shows a **1.50x localization advantage** (Gini 0.553 vs 0.369, p < 4.3e-214, 84.8% win rate) while filtering semantically underdetermined tags to an 'other' category. This threshold-based approach balances semantic flexibility with attributable state, avoiding both the lexical brittleness of keyword matching and the semantic spillover of mean projection."
+
+---
+
+## Understanding the Gold Standard Threshold (τ=0.35)
+
+### What is the Threshold?
+
+When measuring localization, we need to assign each tag to one of 10 semantic facets (food_quality, service, ambiance, etc.). The **threshold τ** determines how confident we need to be before making an assignment.
+
+**The Process:**
+```
+For each tag:
+  1. Compute cosine similarity to each of 10 facet anchors
+  2. Find the facet with HIGHEST similarity
+  3. IF highest_similarity >= τ (0.35):
+       → Assign tag to that facet (attributable state)
+     ELSE:
+       → Assign tag to "other" (semantically underdetermined)
+```
+
+### Why Do We Need a Threshold?
+
+**Without threshold (τ=0.00):** Every tag is forced to match some facet, even with very low similarity.
+
+```
+Example: Tag "interesting history"
+  - Similarity to food_quality:  0.18
+  - Similarity to service:       0.15
+  - Similarity to ambiance:      0.22  ← highest
+  - Similarity to location:      0.21
+
+Without threshold: Assigned to "ambiance" (but 0.22 is weak!)
+With threshold:    Assigned to "other" (0.22 < 0.35)
+```
+
+This weak assignment creates **semantic spillover** — tags that aren't really about any facet still influence the facet profile, making everything look diffuse.
+
+### Why τ=0.35 Specifically?
+
+We tested multiple thresholds:
+
+| Threshold | % to "Other" | Gentag Gini | Interpretation |
+|-----------|--------------|-------------|----------------|
+| 0.00 | 0% | 0.358 | Too permissive (semantic spillover) |
+| 0.25 | 10.6% | 0.522 | Still too permissive |
+| 0.30 | 26.0% | 0.563 | Getting better |
+| **0.35** | **41.2%** | **0.553** | **Balanced (GOLD STANDARD)** |
+| 0.40 | 54.1% | 0.562 | Similar to keyword |
+| 0.50 | 76.8% | 0.571 | Too strict (losing signal) |
+
+**Why 0.35 is the sweet spot:**
+1. **Similar filtering to keyword method** (~41% vs ~50% to "other")
+2. **Semantically justified** — cosine 0.35 represents meaningful similarity in embedding space
+3. **Gini is robust** — not at an extreme (neither too high from over-filtering nor too low from under-filtering)
+
+### The "Attributable State" Argument
+
+In systems that need **persistent semantic state**, only clear, attributable beliefs matter:
+
+- **Tags above threshold (59%):** Clear facet membership → **attributable state**
+- **Tags below threshold (41%):** Weak facet membership → **out-of-ontology semantics**
+
+This is analogous to:
+- **LDA topic models:** Having a "background" topic for non-specific words
+- **NMF factorization:** Having a noise component
+- **Bayesian inference:** Requiring sufficient posterior probability before updating belief
+
+### Plain English Summary
+
+> **The gold standard threshold (τ=0.35) says:** "Only count a tag as belonging to a facet if we're reasonably confident about the assignment (cosine ≥ 0.35). Tags that are ambiguous or unrelated to our 10 facets go into an 'other' bucket and don't influence our localization measurement."
+
+This prevents the measurement from being polluted by weak, forced assignments while still being more flexible than brittle keyword matching.
 
 ---
 
@@ -14,16 +157,17 @@ Phase 3 evaluates gentags against alternative representations for **systems requ
 
 > **Gentags provide a factorized, persistent semantic representation that enables localized change attribution and evidence-sensitive dispersion, which dense embeddings and model-in-the-loop architectures cannot provide.**
 
-| Metric | Gentags | Embeddings | Model-in-Loop |
-|--------|---------|------------|---------------|
-| **Gini coefficient** | **0.657** | 0.361 | N/A |
-| Interpretation | Localized | Diffuse | No state |
-| Exact match stability | — | — | **31.6%** |
-| Persistent state | ✅ Yes | ✅ Yes | ❌ No |
-| Change attribution | ✅ Yes | ❌ No | ❌ No |
-| Cost model | One-time | One-time | Per-query |
+| Metric | Gentags (Gold τ=0.35) | Gentags (Keyword) | Embeddings | Model-in-Loop |
+|--------|----------------------|-------------------|------------|---------------|
+| **Gini coefficient** | **0.553** | 0.657 | 0.369 | N/A |
+| **Advantage vs Embeddings** | **1.50x** | 1.78x | — | — |
+| Interpretation | Localized | Localized (upper bound) | Diffuse | No state |
+| Exact match stability | — | — | — | **31.6%** |
+| Persistent state | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No |
+| Change attribution | ✅ Yes | ✅ Yes | ❌ No | ❌ No |
+| Cost model | One-time | One-time | One-time | Per-query |
 
-**Bottom line:** Gentags provide the only representation that combines persistent state, semantic stability, AND localized change attribution.
+**Bottom line:** Gentags provide the only representation that combines persistent state, semantic stability, AND localized change attribution. The gold standard evaluation (τ=0.35) shows a **1.50x localization advantage** over dense embeddings.
 
 ---
 

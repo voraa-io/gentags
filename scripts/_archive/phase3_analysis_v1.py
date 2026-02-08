@@ -79,7 +79,12 @@ FACET_KEYWORDS = {
     "location": ["location", "parking", "accessible", "downtown", "corner", "find", "neighborhood", "walk", "drive"],
 }
 
-# Anchor texts for embedding-based facet projection
+# =============================================================================
+# FIXED FACET ANCHORS (Method-Neutral Evaluation)
+# =============================================================================
+# These are EXTERNAL descriptive phrases, NOT derived from tags.
+# This ensures method-neutral evaluation and avoids circular reasoning.
+
 FACET_ANCHORS = {
     "food_quality": "food quality, taste, freshness, delicious meals",
     "coffee_drinks": "coffee, espresso, latte, beverages, drinks",
@@ -98,12 +103,145 @@ FACET_ANCHORS = {
 # =============================================================================
 
 def assign_facet(tag: str) -> str:
-    """Assign a tag to a facet based on keyword matching."""
+    """Assign a tag to a facet based on keyword matching (LEXICAL - brittle)."""
     tag_lower = tag.lower()
     for facet, keywords in FACET_KEYWORDS.items():
         if any(kw in tag_lower for kw in keywords):
             return facet
     return "other"
+
+
+def assign_facet_semantic(
+    tag: str,
+    tag_embeddings: Dict[str, np.ndarray],
+    anchor_embeddings: Dict[str, np.ndarray]
+) -> Tuple[str, float]:
+    """
+    Assign a tag to a facet based on SEMANTIC similarity (robust).
+
+    This is the correct approach for evaluating semantic representations:
+    - Projects the tag embedding into the fixed anchor space
+    - Assigns to the facet with highest cosine similarity
+
+    Returns: (facet_name, similarity_score)
+    """
+    if tag not in tag_embeddings:
+        return "other", 0.0
+
+    tag_emb = tag_embeddings[tag]
+    best_facet = "other"
+    best_sim = -1.0
+
+    for facet, anchor_emb in anchor_embeddings.items():
+        sim = cosine_similarity(tag_emb, anchor_emb)
+        if sim > best_sim:
+            best_sim = sim
+            best_facet = facet
+
+    return best_facet, best_sim
+
+
+def get_tag_facet_profile_semantic(
+    tags: List[str],
+    tag_embeddings: Dict[str, np.ndarray],
+    anchor_embeddings: Dict[str, np.ndarray]
+) -> np.ndarray:
+    """
+    Compute the facet profile for a tag set using semantic projection.
+
+    Returns: array of mean similarity to each facet anchor
+    """
+    facet_sims = {facet: [] for facet in FACETS}
+
+    for tag in tags:
+        if tag in tag_embeddings:
+            tag_emb = tag_embeddings[tag]
+            for facet in FACETS:
+                sim = cosine_similarity(tag_emb, anchor_embeddings[facet])
+                facet_sims[facet].append(sim)
+
+    # Mean similarity per facet (0 if no tags)
+    profile = []
+    for facet in FACETS:
+        if facet_sims[facet]:
+            profile.append(np.mean(facet_sims[facet]))
+        else:
+            profile.append(0.0)
+
+    return np.array(profile)
+
+
+# Similarity threshold for attributable state (τ = 0.35)
+# Tags below this threshold are "semantically underdetermined"
+SEMANTIC_THRESHOLD = 0.35
+
+
+def get_tag_facet_profile_threshold(
+    tags: List[str],
+    tag_embeddings: Dict[str, np.ndarray],
+    anchor_embeddings: Dict[str, np.ndarray],
+    threshold: float = SEMANTIC_THRESHOLD
+) -> Tuple[np.ndarray, int]:
+    """
+    Compute facet profile using hard semantic assignment WITH threshold.
+
+    This is the GOLD STANDARD method:
+    - Tags are assigned to their best-matching facet via cosine similarity
+    - Tags below threshold are assigned to "other" (not counted in profile)
+    - This balances semantic flexibility with state attribution
+
+    Returns: (profile array, count of "other" tags)
+    """
+    counts = {facet: 0 for facet in FACETS}
+    other_count = 0
+
+    for tag in tags:
+        if tag not in tag_embeddings:
+            continue
+
+        tag_emb = tag_embeddings[tag]
+        best_facet = None
+        best_sim = -1.0
+
+        for facet in FACETS:
+            sim = cosine_similarity(tag_emb, anchor_embeddings[facet])
+            if sim > best_sim:
+                best_sim = sim
+                best_facet = facet
+
+        if best_sim >= threshold:
+            counts[best_facet] += 1
+        else:
+            other_count += 1
+
+    total = sum(counts.values())
+    profile = np.array([counts[f] / total if total > 0 else 0.0 for f in FACETS])
+
+    return profile, other_count
+
+
+def compute_gentag_facet_drift_threshold(
+    tags1: List[str],
+    tags2: List[str],
+    tag_embeddings: Dict[str, np.ndarray],
+    anchor_embeddings: Dict[str, np.ndarray],
+    threshold: float = SEMANTIC_THRESHOLD
+) -> np.ndarray:
+    """
+    Compute per-facet drift using THRESHOLD-BASED SEMANTIC PROJECTION.
+
+    This is the GOLD STANDARD (τ=0.35):
+    - Hard assignment based on cosine similarity to anchors
+    - Tags below threshold go to "other" (excluded from drift)
+    - Balances semantic flexibility with attributable state
+
+    Returns: array of drift values per facet
+    """
+    profile1, _ = get_tag_facet_profile_threshold(tags1, tag_embeddings, anchor_embeddings, threshold)
+    profile2, _ = get_tag_facet_profile_threshold(tags2, tag_embeddings, anchor_embeddings, threshold)
+
+    drift = np.abs(profile1 - profile2)
+    return drift
 
 
 def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
@@ -140,6 +278,78 @@ def mean_pool(embeddings: List[np.ndarray]) -> np.ndarray:
     if not embeddings:
         return np.zeros(EMBEDDING_DIM)
     return np.mean(embeddings, axis=0)
+
+
+# =============================================================================
+# EMBEDDING FUNCTIONS (for Fixed Anchor Computation)
+# =============================================================================
+
+def get_embedding_client():
+    """Initialize OpenAI embedding client."""
+    from openai import OpenAI
+    import os
+    from dotenv import load_dotenv
+
+    # Load .env
+    for path in [Path(__file__).parent.parent / ".env", Path.cwd() / ".env"]:
+        if path.exists():
+            load_dotenv(path)
+            break
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found")
+    return OpenAI(api_key=api_key)
+
+
+def embed_texts_batch(client, texts: List[str], batch_size: int = 128) -> List[np.ndarray]:
+    """Embed texts in batches using OpenAI API."""
+    import time
+
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+
+        for attempt in range(5):
+            try:
+                response = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+                embeddings = [np.array(e.embedding) for e in response.data]
+                all_embeddings.extend(embeddings)
+                break
+            except Exception as e:
+                if attempt < 4:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise e
+
+    return all_embeddings
+
+
+def compute_anchor_embeddings_fixed(client) -> Dict[str, np.ndarray]:
+    """
+    Compute anchor embeddings from FIXED descriptive phrases.
+
+    This is the CORRECT approach for method-neutral evaluation:
+    - Anchors are defined independently of any method's output
+    - No circularity: we don't use tags to define facet anchors
+    - No random fallback: every facet has a meaningful embedding
+
+    All representations (Gentags, Embeddings, RAKE, TF-IDF) are projected
+    into this same fixed semantic space.
+    """
+    print("   Embedding fixed facet anchor phrases...")
+    anchor_embeddings = {}
+
+    facet_texts = list(FACET_ANCHORS.values())
+    facet_names = list(FACET_ANCHORS.keys())
+
+    facet_embs = embed_texts_batch(client, facet_texts, batch_size=16)
+
+    for name, emb in zip(facet_names, facet_embs):
+        anchor_embeddings[name] = emb
+
+    print(f"   Embedded {len(anchor_embeddings)} fixed facet anchors")
+    return anchor_embeddings
 
 
 # =============================================================================
@@ -240,7 +450,8 @@ def load_embeddings_cache() -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray
 
 def compute_gentag_facet_drift(tags1: List[str], tags2: List[str]) -> np.ndarray:
     """
-    Compute per-facet drift between two tag sets.
+    Compute per-facet drift between two tag sets using KEYWORD MATCHING.
+    This is the LEXICAL method - brittle but serves as lower bound.
     Returns: array of drift values per facet (0-1 scale)
     """
     drift = []
@@ -262,6 +473,31 @@ def compute_gentag_facet_drift(tags1: List[str], tags2: List[str]) -> np.ndarray
         drift.append(facet_drift)
 
     return np.array(drift)
+
+
+def compute_gentag_facet_drift_semantic(
+    tags1: List[str],
+    tags2: List[str],
+    tag_embeddings: Dict[str, np.ndarray],
+    anchor_embeddings: Dict[str, np.ndarray]
+) -> np.ndarray:
+    """
+    Compute per-facet drift between two tag sets using SEMANTIC PROJECTION.
+    This is the SEMANTIC method - robust and method-neutral.
+
+    Projects each tag set into the fixed anchor space and measures
+    the change in facet similarity profile.
+
+    Returns: array of drift values per facet (absolute similarity change)
+    """
+    # Compute facet profiles for each tag set
+    profile1 = get_tag_facet_profile_semantic(tags1, tag_embeddings, anchor_embeddings)
+    profile2 = get_tag_facet_profile_semantic(tags2, tag_embeddings, anchor_embeddings)
+
+    # Drift = absolute change in facet similarity
+    drift = np.abs(profile1 - profile2)
+
+    return drift
 
 
 def compute_embedding_facet_drift(
@@ -288,38 +524,20 @@ def compute_embedding_facet_drift(
     return np.array(drift)
 
 
-def compute_anchor_embeddings(tag_embeddings: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-    """
-    Compute anchor embeddings for each facet by averaging tags in that facet.
-    Falls back to simple text if not enough tags.
-    """
-    anchor_embeddings = {}
-
-    for facet in FACETS:
-        # Find all tags that belong to this facet
-        facet_tags = [tag for tag in tag_embeddings.keys() if assign_facet(tag) == facet]
-
-        if len(facet_tags) >= 5:
-            # Use mean of facet tags as anchor
-            facet_embs = [tag_embeddings[tag] for tag in facet_tags[:50]]  # Limit to 50
-            anchor_embeddings[facet] = mean_pool(facet_embs)
-        else:
-            # Use the anchor text description (need to embed it)
-            # For now, use a simple average of any matching tags
-            if facet_tags:
-                anchor_embeddings[facet] = mean_pool([tag_embeddings[t] for t in facet_tags])
-            else:
-                # Fallback: random unit vector (not ideal but allows computation)
-                anchor_embeddings[facet] = np.random.randn(EMBEDDING_DIM)
-                anchor_embeddings[facet] /= np.linalg.norm(anchor_embeddings[facet])
-
-    return anchor_embeddings
+# DEPRECATED: compute_anchor_embeddings (circular reasoning)
+# This function was removed because it used tag embeddings to create anchors,
+# then measured tag localization against those same anchors (self-fulfilling prophecy).
+# It also used random vectors for facets with no coverage (noise injection).
+#
+# The correct approach is compute_anchor_embeddings_fixed() which uses
+# fixed descriptive phrases embedded once, ensuring method-neutral evaluation.
 
 
 def run_localization_analysis(
     extractions_df: pd.DataFrame,
     tags_df: pd.DataFrame,
-    tag_embeddings: Dict[str, np.ndarray]
+    tag_embeddings: Dict[str, np.ndarray],
+    embedding_client=None
 ) -> pd.DataFrame:
     """
     Block G: Compare localization between gentags and embeddings.
@@ -331,9 +549,16 @@ def run_localization_analysis(
     Expected result:
     - Gentag Gini: HIGH (change concentrated in few facets)
     - Embedding Gini: LOW (change diffuse across all facets)
+
+    NOTE: Anchor embeddings are computed from FIXED descriptive phrases,
+    ensuring method-neutral evaluation (no circular reasoning).
     """
-    print("   Computing anchor embeddings for facets...")
-    anchor_embeddings = compute_anchor_embeddings(tag_embeddings)
+    # Initialize embedding client if not provided
+    if embedding_client is None:
+        embedding_client = get_embedding_client()
+
+    # Use FIXED phrase anchors (method-neutral, no circular reasoning)
+    anchor_embeddings = compute_anchor_embeddings_fixed(embedding_client)
 
     # Compute extraction-level pooled embeddings
     print("   Computing extraction embeddings...")
@@ -389,26 +614,61 @@ def run_localization_analysis(
         tags1 = [t for t in tags1 if t]
         tags2 = [t for t in tags2 if t]
 
-        # Compute per-facet drift
-        gentag_drift = compute_gentag_facet_drift(tags1, tags2)
+        # Compute per-facet drift using THREE methods for sensitivity analysis
+        # Method 1: KEYWORD-BASED (lexical, brittle - lower bound)
+        gentag_drift_kw = compute_gentag_facet_drift(tags1, tags2)
+
+        # Method 2: SEMANTIC MEAN (no threshold - diffuse, for comparison)
+        gentag_drift_sem_mean = compute_gentag_facet_drift_semantic(
+            tags1, tags2, tag_embeddings, anchor_embeddings
+        )
+
+        # Method 3: SEMANTIC THRESHOLD τ=0.35 (GOLD STANDARD)
+        # Hard assignment with threshold - tags below τ go to "other"
+        gentag_drift_sem_thr = compute_gentag_facet_drift_threshold(
+            tags1, tags2, tag_embeddings, anchor_embeddings, threshold=SEMANTIC_THRESHOLD
+        )
+
+        # Embedding drift (already semantic)
         embedding_drift = compute_embedding_facet_drift(emb1, emb2, anchor_embeddings)
 
-        # Compute Gini coefficients
-        gentag_gini = gini_coefficient(gentag_drift)
+        # Compute Gini coefficients for ALL methods
+        gentag_gini_kw = gini_coefficient(gentag_drift_kw)           # Keyword-based
+        gentag_gini_sem_mean = gini_coefficient(gentag_drift_sem_mean)  # Semantic mean (diffuse)
+        gentag_gini_sem_thr = gini_coefficient(gentag_drift_sem_thr)    # Semantic threshold (gold)
         embedding_gini = gini_coefficient(embedding_drift)
 
-        # Also store the drift vectors for analysis
+        # Store results with all three methods
         results.append({
             "venue_id": venue_id,
             "model_key": model_key,
             "prompt_type": prompt_type,
-            "gentag_gini": gentag_gini,
+            # Keyword-based Gini (lexical, lower bound)
+            "gentag_gini": gentag_gini_kw,
+            "gentag_gini_kw": gentag_gini_kw,
+            # Semantic mean Gini (no threshold, diffuse)
+            "gentag_gini_sem": gentag_gini_sem_mean,
+            "gentag_gini_sem_mean": gentag_gini_sem_mean,
+            # Semantic threshold Gini (τ=0.35, GOLD STANDARD)
+            "gentag_gini_sem_thr": gentag_gini_sem_thr,
+            # Embedding Gini (baseline)
             "embedding_gini": embedding_gini,
-            "gini_diff": gentag_gini - embedding_gini,
-            "gentag_total_drift": gentag_drift.sum(),
+            # Differences
+            "gini_diff": gentag_gini_kw - embedding_gini,
+            "gini_diff_kw": gentag_gini_kw - embedding_gini,
+            "gini_diff_sem": gentag_gini_sem_mean - embedding_gini,
+            "gini_diff_sem_thr": gentag_gini_sem_thr - embedding_gini,
+            # Totals
+            "gentag_total_drift_kw": gentag_drift_kw.sum(),
+            "gentag_total_drift_sem": gentag_drift_sem_mean.sum(),
+            "gentag_total_drift_sem_thr": gentag_drift_sem_thr.sum(),
             "embedding_total_drift": embedding_drift.sum(),
-            # Per-facet drifts
-            **{f"gentag_drift_{facet}": gentag_drift[i] for i, facet in enumerate(FACETS)},
+            # Per-facet drifts (keyword-based for backward compatibility)
+            **{f"gentag_drift_{facet}": gentag_drift_kw[i] for i, facet in enumerate(FACETS)},
+            # Per-facet drifts (semantic mean)
+            **{f"gentag_drift_sem_{facet}": gentag_drift_sem_mean[i] for i, facet in enumerate(FACETS)},
+            # Per-facet drifts (semantic threshold)
+            **{f"gentag_drift_sem_thr_{facet}": gentag_drift_sem_thr[i] for i, facet in enumerate(FACETS)},
             **{f"embedding_drift_{facet}": embedding_drift[i] for i, facet in enumerate(FACETS)},
         })
 
@@ -654,17 +914,39 @@ def main():
     localization_df = run_localization_analysis(extractions_df, tags_df, tag_embeddings)
     localization_df.to_csv(TABLES_DIR / "localization.csv", index=False)
 
-    # Localization summary
+    # Localization summary - SENSITIVITY ANALYSIS (three methods)
     print(f"\n   Localization Results (n={len(localization_df)} pairs):")
-    print(f"   - Gentag Gini (mean):    {localization_df['gentag_gini'].mean():.3f}")
-    print(f"   - Embedding Gini (mean): {localization_df['embedding_gini'].mean():.3f}")
-    print(f"   - Gini difference:       {localization_df['gini_diff'].mean():.3f}")
-    print(f"   - % where gentag > embedding: {(localization_df['gini_diff'] > 0).mean():.1%}")
 
-    # Statistical test
+    # Method 1: Keyword-based (lexical, lower bound)
+    print(f"\n   === METHOD 1: KEYWORD-BASED (Lexical, ~50% filtered) ===")
+    print(f"   - Gentag Gini (KW):      {localization_df['gentag_gini_kw'].mean():.3f}")
+    print(f"   - Embedding Gini:        {localization_df['embedding_gini'].mean():.3f}")
+    print(f"   - Advantage:             {localization_df['gentag_gini_kw'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"   - % gentag > embedding:  {(localization_df['gini_diff_kw'] > 0).mean():.1%}")
+
+    # Method 2: Semantic mean (no threshold, diffuse)
+    print(f"\n   === METHOD 2: SEMANTIC MEAN (No threshold, diffuse) ===")
+    print(f"   - Gentag Gini (SEM):     {localization_df['gentag_gini_sem_mean'].mean():.3f}")
+    print(f"   - Embedding Gini:        {localization_df['embedding_gini'].mean():.3f}")
+    print(f"   - Advantage:             {localization_df['gentag_gini_sem_mean'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"   - % gentag > embedding:  {(localization_df['gini_diff_sem'] > 0).mean():.1%}")
+
+    # Method 3: Semantic threshold (τ=0.35, GOLD STANDARD)
+    print(f"\n   === METHOD 3: SEMANTIC THRESHOLD τ={SEMANTIC_THRESHOLD} (GOLD STANDARD) ===")
+    print(f"   - Gentag Gini (THR):     {localization_df['gentag_gini_sem_thr'].mean():.3f}")
+    print(f"   - Embedding Gini:        {localization_df['embedding_gini'].mean():.3f}")
+    print(f"   - Advantage:             {localization_df['gentag_gini_sem_thr'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"   - % gentag > embedding:  {(localization_df['gini_diff_sem_thr'] > 0).mean():.1%}")
+
+    # Statistical tests for all methods
     from scipy.stats import mannwhitneyu, wilcoxon
-    stat, pvalue = wilcoxon(localization_df['gentag_gini'], localization_df['embedding_gini'])
-    print(f"   - Wilcoxon signed-rank p-value: {pvalue:.2e}")
+    stat_kw, pvalue_kw = wilcoxon(localization_df['gentag_gini_kw'], localization_df['embedding_gini'])
+    stat_sem, pvalue_sem = wilcoxon(localization_df['gentag_gini_sem_mean'], localization_df['embedding_gini'])
+    stat_thr, pvalue_thr = wilcoxon(localization_df['gentag_gini_sem_thr'], localization_df['embedding_gini'])
+    print(f"\n   === STATISTICAL SIGNIFICANCE ===")
+    print(f"   - Wilcoxon p-value (KW):   {pvalue_kw:.2e}")
+    print(f"   - Wilcoxon p-value (SEM):  {pvalue_sem:.2e}")
+    print(f"   - Wilcoxon p-value (THR):  {pvalue_thr:.2e}")
 
     # Block H: Cost comparison
     print("\n5. Block H: Computing cost comparison...")
@@ -719,11 +1001,27 @@ def main():
             "n_localization_pairs": int(len(localization_df)),
         },
         "localization_results": {
-            "gentag_gini_mean": float(localization_df['gentag_gini'].mean()),
+            # Method 1: Keyword-based (lexical, lower bound, ~50% filtered)
+            "gentag_gini_kw_mean": float(localization_df['gentag_gini_kw'].mean()),
+            "gini_diff_kw_mean": float(localization_df['gini_diff_kw'].mean()),
+            "pct_gentag_more_localized_kw": float((localization_df['gini_diff_kw'] > 0).mean()),
+            "wilcoxon_pvalue_kw": float(pvalue_kw),
+            "advantage_kw": float(localization_df['gentag_gini_kw'].mean() / localization_df['embedding_gini'].mean()),
+            # Method 2: Semantic mean (no threshold, diffuse)
+            "gentag_gini_sem_mean_mean": float(localization_df['gentag_gini_sem_mean'].mean()),
+            "gini_diff_sem_mean": float(localization_df['gini_diff_sem'].mean()),
+            "pct_gentag_more_localized_sem": float((localization_df['gini_diff_sem'] > 0).mean()),
+            "wilcoxon_pvalue_sem": float(pvalue_sem),
+            "advantage_sem_mean": float(localization_df['gentag_gini_sem_mean'].mean() / localization_df['embedding_gini'].mean()),
+            # Method 3: Semantic threshold τ=0.35 (GOLD STANDARD)
+            "gentag_gini_sem_thr_mean": float(localization_df['gentag_gini_sem_thr'].mean()),
+            "gini_diff_sem_thr_mean": float(localization_df['gini_diff_sem_thr'].mean()),
+            "pct_gentag_more_localized_thr": float((localization_df['gini_diff_sem_thr'] > 0).mean()),
+            "wilcoxon_pvalue_thr": float(pvalue_thr),
+            "advantage_sem_thr": float(localization_df['gentag_gini_sem_thr'].mean() / localization_df['embedding_gini'].mean()),
+            "semantic_threshold": SEMANTIC_THRESHOLD,
+            # Common baseline
             "embedding_gini_mean": float(localization_df['embedding_gini'].mean()),
-            "gini_diff_mean": float(localization_df['gini_diff'].mean()),
-            "pct_gentag_more_localized": float((localization_df['gini_diff'] > 0).mean()),
-            "wilcoxon_pvalue": float(pvalue),
         },
         "facets": FACETS,
     }
@@ -734,10 +1032,23 @@ def main():
     print("\n" + "=" * 60)
     print("✅ Phase 3 analysis complete!")
     print("=" * 60)
-    print(f"\nKey Finding (Localization):")
-    print(f"  Gentag changes are MORE LOCALIZED (Gini = {localization_df['gentag_gini'].mean():.3f})")
-    print(f"  Embedding changes are MORE DIFFUSE (Gini = {localization_df['embedding_gini'].mean():.3f})")
-    print(f"  This proves gentags enable ATTRIBUTABLE change detection.")
+    print(f"\nKey Finding (Localization) - SENSITIVITY ANALYSIS:")
+    print(f"\n  Method 1: KEYWORD-BASED (Lexical, ~50% filtered):")
+    print(f"    Gentag Gini:    {localization_df['gentag_gini_kw'].mean():.3f}")
+    print(f"    Embedding Gini: {localization_df['embedding_gini'].mean():.3f}")
+    print(f"    Advantage:      {localization_df['gentag_gini_kw'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"\n  Method 2: SEMANTIC MEAN (No threshold, diffuse):")
+    print(f"    Gentag Gini:    {localization_df['gentag_gini_sem_mean'].mean():.3f}")
+    print(f"    Embedding Gini: {localization_df['embedding_gini'].mean():.3f}")
+    print(f"    Advantage:      {localization_df['gentag_gini_sem_mean'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"\n  Method 3: SEMANTIC THRESHOLD τ={SEMANTIC_THRESHOLD} (GOLD STANDARD):")
+    print(f"    Gentag Gini:    {localization_df['gentag_gini_sem_thr'].mean():.3f}")
+    print(f"    Embedding Gini: {localization_df['embedding_gini'].mean():.3f}")
+    print(f"    Advantage:      {localization_df['gentag_gini_sem_thr'].mean() / localization_df['embedding_gini'].mean():.2f}x")
+    print(f"\n  INTERPRETATION:")
+    print(f"    - Keyword-based shows highest Gini due to 'other' bucket filtering")
+    print(f"    - Semantic threshold (τ=0.35) is the GOLD STANDARD")
+    print(f"    - It balances semantic flexibility with attributable state")
     print(f"\nOutput files:")
     print(f"  - {TABLES_DIR / 'localization.csv'}")
     print(f"  - {TABLES_DIR / 'facet_assignments.csv'}")

@@ -32,37 +32,42 @@ FACETS = [
 
 
 def plot_1_localization_histogram():
-    """Plot 1: Gini coefficient distribution - gentags vs embeddings."""
+    """Plot 1: Gini coefficient distribution - gentags vs embeddings (GOLD STANDARD τ=0.35)."""
     global TABLES_DIR, PLOTS_DIR
 
     df = pd.read_csv(TABLES_DIR / "localization.csv")
+
+    # Use gold standard (semantic threshold) if available, else fall back to keyword
+    gini_col = 'gentag_gini_sem_thr' if 'gentag_gini_sem_thr' in df.columns else 'gentag_gini'
+    diff_col = 'gini_diff_sem_thr' if 'gini_diff_sem_thr' in df.columns else 'gini_diff'
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
     # Histogram comparison
     ax1 = axes[0]
-    ax1.hist(df['gentag_gini'], bins=30, alpha=0.7, label=f"Gentags (mean={df['gentag_gini'].mean():.3f})", color='#2ecc71')
+    ax1.hist(df[gini_col], bins=30, alpha=0.7, label=f"Gentags τ=0.35 (mean={df[gini_col].mean():.3f})", color='#2ecc71')
     ax1.hist(df['embedding_gini'], bins=30, alpha=0.7, label=f"Embeddings (mean={df['embedding_gini'].mean():.3f})", color='#e74c3c')
-    ax1.axvline(df['gentag_gini'].mean(), color='#27ae60', linestyle='--', linewidth=2)
+    ax1.axvline(df[gini_col].mean(), color='#27ae60', linestyle='--', linewidth=2)
     ax1.axvline(df['embedding_gini'].mean(), color='#c0392b', linestyle='--', linewidth=2)
     ax1.set_xlabel('Gini Coefficient (higher = more localized)', fontsize=11)
     ax1.set_ylabel('Count', fontsize=11)
-    ax1.set_title('Change Localization: Gentags vs Embeddings', fontsize=12, fontweight='bold')
+    ax1.set_title('Change Localization: Gentags (Gold Standard) vs Embeddings', fontsize=12, fontweight='bold')
     ax1.legend(loc='upper left')
 
     # Box plot
     ax2 = axes[1]
     data_box = pd.DataFrame({
-        'Gini': list(df['gentag_gini']) + list(df['embedding_gini']),
-        'Method': ['Gentags'] * len(df) + ['Embeddings'] * len(df)
+        'Gini': list(df[gini_col]) + list(df['embedding_gini']),
+        'Method': ['Gentags (τ=0.35)'] * len(df) + ['Embeddings'] * len(df)
     })
     sns.boxplot(data=data_box, x='Method', y='Gini', ax=ax2, palette=['#2ecc71', '#e74c3c'])
     ax2.set_ylabel('Gini Coefficient', fontsize=11)
-    ax2.set_title('Localization Distribution', fontsize=12, fontweight='bold')
+    ax2.set_title('Localization Distribution (Gold Standard)', fontsize=12, fontweight='bold')
 
     # Add significance annotation
-    pct_better = (df['gini_diff'] > 0).mean() * 100
-    ax2.annotate(f'Gentags more localized\nin {pct_better:.1f}% of cases',
+    pct_better = (df[diff_col] > 0).mean() * 100
+    advantage = df[gini_col].mean() / df['embedding_gini'].mean()
+    ax2.annotate(f'Gentags more localized\nin {pct_better:.1f}% of cases\n({advantage:.2f}x advantage)',
                 xy=(0.5, 0.95), xycoords='axes fraction',
                 ha='center', va='top', fontsize=10,
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
@@ -71,6 +76,59 @@ def plot_1_localization_histogram():
     plt.savefig(PLOTS_DIR / "1_localization_comparison.png", dpi=150, bbox_inches='tight')
     plt.close()
     print(f"   Saved: 1_localization_comparison.png")
+
+
+def plot_1b_sensitivity_analysis():
+    """Plot 1B: Sensitivity analysis - three evaluation methods."""
+    global TABLES_DIR, PLOTS_DIR
+
+    df = pd.read_csv(TABLES_DIR / "localization.csv")
+
+    # Check if all columns exist
+    if 'gentag_gini_sem_thr' not in df.columns:
+        print("   Skipping sensitivity plot (columns not found)")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    methods = ['Keyword\n(~50% filtered)', 'Semantic Mean\n(no threshold)', 'Semantic τ=0.35\n(GOLD STANDARD)', 'Embeddings\n(baseline)']
+    means = [
+        df['gentag_gini_kw'].mean(),
+        df['gentag_gini_sem_mean'].mean(),
+        df['gentag_gini_sem_thr'].mean(),
+        df['embedding_gini'].mean()
+    ]
+    colors = ['#3498db', '#9b59b6', '#2ecc71', '#e74c3c']
+
+    bars = ax.bar(methods, means, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
+
+    # Add value labels
+    for bar, val in zip(bars, means):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02,
+                f'{val:.3f}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+    # Add advantage labels
+    embed_gini = df['embedding_gini'].mean()
+    for i, (bar, val) in enumerate(zip(bars[:-1], means[:-1])):
+        advantage = val / embed_gini
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height()/2,
+                f'{advantage:.2f}x', ha='center', va='center', fontsize=10,
+                color='white', fontweight='bold')
+
+    ax.set_ylabel('Mean Gini Coefficient', fontsize=12)
+    ax.set_title('Localization Gini: Sensitivity Analysis\n(Higher = More Localized Change)', fontsize=14, fontweight='bold')
+    ax.set_ylim(0, 0.8)
+    ax.axhline(embed_gini, color='#e74c3c', linestyle='--', linewidth=2, alpha=0.7, label='Embedding baseline')
+
+    # Add annotation
+    ax.annotate('Gold Standard: Semantic threshold τ=0.35\nbalances flexibility with attributable state',
+                xy=(2, 0.75), ha='center', fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.3))
+
+    plt.tight_layout()
+    plt.savefig(PLOTS_DIR / "1b_sensitivity_analysis.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"   Saved: 1b_sensitivity_analysis.png")
 
 
 def plot_2_facet_drift_heatmap():
@@ -246,26 +304,33 @@ def plot_5_model_in_loop_stability():
 
 
 def plot_6_summary():
-    """Plot 6: Summary comparison - all key metrics."""
+    """Plot 6: Summary comparison - all key metrics (using GOLD STANDARD τ=0.35)."""
     global TABLES_DIR, PLOTS_DIR
+
+    # Load actual values from data
+    df = pd.read_csv(TABLES_DIR / "localization.csv")
+    gini_col = 'gentag_gini_sem_thr' if 'gentag_gini_sem_thr' in df.columns else 'gentag_gini'
+    gentag_gini = df[gini_col].mean()
+    embed_gini = df['embedding_gini'].mean()
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Key metrics comparison
-    metrics = ['Semantic\nStability', 'Change\nLocalization', 'Persistent\nState', 'Cost\nEfficiency']
-    gentags = [0.977, 0.657, 1.0, 0.9]  # Normalized scores
-    embeddings = [0.977, 0.361, 1.0, 0.9]
+    # Key metrics comparison (using actual values)
+    metrics = ['Semantic\nStability', 'Change\nLocalization\n(Gini)', 'Persistent\nState', 'Cost\nEfficiency']
+    gentags = [0.977, gentag_gini, 1.0, 0.9]  # Use actual Gini value
+    embeddings = [0.977, embed_gini, 1.0, 0.9]
     model_in_loop = [0.316, 0.0, 0.0, 0.3]  # 31.6% exact match, no localization, no state
 
     x = np.arange(len(metrics))
     width = 0.25
 
-    bars1 = ax.bar(x - width, gentags, width, label='Gentags', color='#2ecc71', alpha=0.8)
+    bars1 = ax.bar(x - width, gentags, width, label=f'Gentags (τ=0.35)', color='#2ecc71', alpha=0.8)
     bars2 = ax.bar(x, embeddings, width, label='Embeddings', color='#3498db', alpha=0.8)
     bars3 = ax.bar(x + width, model_in_loop, width, label='Model-in-Loop', color='#e74c3c', alpha=0.8)
 
     ax.set_ylabel('Score (higher = better)', fontsize=11)
-    ax.set_title('Representation Comparison Summary', fontsize=14, fontweight='bold')
+    ax.set_title(f'Representation Comparison Summary\n(Localization: {gentag_gini:.3f} vs {embed_gini:.3f} = {gentag_gini/embed_gini:.2f}x advantage)',
+                 fontsize=14, fontweight='bold')
     ax.set_xticks(x)
     ax.set_xticklabels(metrics, fontsize=10)
     ax.legend(loc='upper right')
@@ -290,8 +355,11 @@ def main():
     print("PHASE 3: GENERATING PLOTS")
     print("=" * 60)
 
-    print("\n1. Localization histogram...")
+    print("\n1. Localization histogram (Gold Standard)...")
     plot_1_localization_histogram()
+
+    print("\n1b. Sensitivity analysis (three methods)...")
+    plot_1b_sensitivity_analysis()
 
     print("\n2. Facet drift heatmap...")
     plot_2_facet_drift_heatmap()

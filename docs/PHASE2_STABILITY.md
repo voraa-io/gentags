@@ -170,6 +170,34 @@ Core extracted meaning remains consistent.
 
 **Answer:** YES — **Correlation = -0.230** (negative as expected)
 
+**Definition (plain):** Representation variability is how much the gentag representation changes
+for the **same venue** when we repeat extraction across runs/models/prompts. We measure it as
+the mean pairwise distance (1 − cosine) among the 24 tag embeddings
+(4 models × 3 prompts × 2 runs). Lower = more repeatable; higher = less repeatable.
+
+**Note (framing):** Look at the bigger picture. We are not trying to prove that OpenAI’s random seed
+is consistent; we are trying to prove that Gentags function as a stable representation
+infrastructure for a venue’s semantic state. If you switch S4 to only use “same model +
+same prompt + run 1 vs. run 2,” you are effectively measuring aleatoric uncertainty
+(the model’s internal sampling noise). That is a baseline reliability check. What we have
+right now—correlating evidence with the spread across 24 different representations—is
+measuring **semantic identifiability**.
+
+**Why this implementation matters:**
+1. Identifiability vs. stochasticity. The “same model” approach only tells us if a model is
+repeating itself. The current ensemble approach shows that when evidence is sparse, the
+semantic state is weakly constrained, regardless of model or prompt.
+2. Representation infrastructure defense. Robust representations should be recoverable by
+different competent “observers.” The -0.230 correlation across 4 models × 3 prompts shows
+the evidence, not the model, is the limiting factor in defining the venue’s semantic state.
+3. Comparison with successes. Ensemble consistency is a standard way to show a semantic
+state is “findable.” This aligns Gentags with high-impact work that validates representation
+stability beyond a single model run.
+
+**Actionable framing:** Keep S4 as an ensemble dispersion test and name it as evidence-induced
+dispersion or cross-model identifiability. A venue with very low tokens (e.g., <200) has a
+fundamentally under-determined Gentag state; as evidence increases, dispersion decreases.
+
 ### Results
 
 | Metric | Value |
@@ -196,6 +224,43 @@ The negative correlation confirms:
 
 This shows variability indicates **lower identifiability**, not noise. When representations vary across runs/models, the evidence weakly constrains the semantic state — sparse venues have weaker grounding.
 
+### Concrete Examples (From S4 Data)
+
+**Sparse evidence (high variability):**
+- `KzvuSntI35Z638fGoOJ4` — `total_tokens=12`, `mean_pairwise_distance=0.307`
+- `GVn2q90PoVQ5p6EcJb4W` — `total_tokens=5`, `mean_pairwise_distance=0.129`
+
+**Dense evidence (low variability):**
+- `KpUCiPXVvQRWMFJACn0I` — `total_tokens=1051`, `mean_pairwise_distance=0.042`
+
+### Experiment Examples (Text + Gentags)
+
+**Sparse venue:** `KzvuSntI35Z638fGoOJ4`  
+Reviews (sample):
+- “It’s fine but it doesn’t have ramps for the disabled.”
+- “SOME #”
+
+Gentags (Claude, `anti_hallucination`):
+- Run 1: `not wheelchair accessible`, `lack disability access`, `no ramp`
+- Run 2: `not wheelchair accessible`, `no ramp`, `accessibility issue`
+
+**Sparse venue:** `GVn2q90PoVQ5p6EcJb4W`  
+Reviews (sample):
+- “very rich and fast service”
+
+Gentags (Claude, `anti_hallucination`):
+- Run 1: `rich food`, `fast service`
+- Run 2: `rich food`, `fast service`
+
+**Dense venue:** `KpUCiPXVvQRWMFJACn0I`  
+Reviews (sample):
+- “Food was awesome, service was great. Only downside was the space. It is incredibly tight in there… oysters were a hit or miss… drinks were awesome..”
+- “Two words: happy hour… $3 oysters… tuna tartare… patio… amazing service.”
+
+Gentags (Claude, `anti_hallucination`):
+- Run 1: `thin smash burger patty`, `oyster hit or miss`, `top three best cheeseburger`, `lobster roll just ok`, `hamburger just ok`, `mid tuna tartare`, `not very chilled`, `no drawn butter`, `no lemon wedge`, `cheap processed cheese`, `generic tuna tartare`, `patio people watching`
+- Run 2: `thin smash burger patty`, `oyster hit or miss`, `lobster roll just ok`, `poorly portioned lobster roll`, `top three best cheeseburger`, `short rib patty`, `generic tuna tartare`, `no drawn butter`, `no lemon wedge`, `mid tuna tartare`, `cheap processed cheese`, `not very chilled`
+
 ![Sparsity Analysis](../results/phase2/plots/7_sparsity_analysis.png)
 
 ---
@@ -217,6 +282,26 @@ This shows variability indicates **lower identifiability**, not noise. When repr
 ### Interpretation
 
 Gentags achieve 0.164 higher cosine similarity to their source reviews compared to random tags. This confirms gentags are not arbitrary text fragments but meaningful semantic summaries.
+
+### Retention Examples (From Phase 2 Data)
+
+**Venue:** `KzvuSntI35Z638fGoOJ4` (sparse)  
+- Mean retention: **0.511**  
+- Mean random baseline: **0.248**  
+- Mean delta: **+0.262**  
+- Sample extraction (Claude, `anti_hallucination`, run 1): retention **0.581**, random **0.297**, delta **+0.285**
+
+**Venue:** `GVn2q90PoVQ5p6EcJb4W` (very sparse)  
+- Mean retention: **0.780**  
+- Mean random baseline: **0.308**  
+- Mean delta: **+0.472**  
+- Sample extraction (Claude, `anti_hallucination`, run 1): retention **0.777**, random **0.340**, delta **+0.437**
+
+**Venue:** `KpUCiPXVvQRWMFJACn0I` (dense)  
+- Mean retention: **0.553**  
+- Mean random baseline: **0.431**  
+- Mean delta: **+0.122**  
+- Sample extraction (Claude, `anti_hallucination`, run 1): retention **0.538**, random **0.440**, delta **+0.098**
 
 ![Retention](../results/phase2/plots/4_retention.png)
 
@@ -309,7 +394,6 @@ Evidence:
 - `results/phase2/tables/prompt_sensitivity.csv`
 - `results/phase2/tables/model_sensitivity.csv`
 - `results/phase2/tables/retention.csv`
-- `results/phase2/tables/uncertainty_dispersion.csv` (dispersion table; filename retained)
 - `results/phase2/tables/sparsity_analysis.csv`
 
 ### Plots

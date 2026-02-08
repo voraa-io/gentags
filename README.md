@@ -1,8 +1,8 @@
-# Gentags: Emergent Semantic Tags from Sparse Reviews
+# Gentags: Discrete Semantic State for Language-Based Systems
 
 Gentags (Generative Tags) are semantic attributes automatically extracted by large language models from sparse textual data (e.g., brief venue reviews).
 
-Gentags form an **emergent, language-native semantic layer** that represents venue atmosphere, suitability, and contextual use cases. While machine-generated rather than user-contributed, gentags resemble folksonomies in structure and utility: they are interpretable, compositional, and arise without predefined taxonomies. This makes them suitable as a semantic substrate for venue discovery and decision-support in low-data environments.
+Gentags form a **persistent, inspectable semantic state** composed of discrete propositions (1–4 words). They externalize model judgments into an addressable representation that can be stored, compared, and updated. While machine-generated rather than user-contributed, gentags resemble folksonomies in structure and utility: they are interpretable, compositional, and arise without predefined taxonomies.
 
 ---
 
@@ -168,39 +168,42 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 
 ### Study 1 Progress
 
-| Phase | Description | Status |
-|-------|-------------|--------|
+| Section | Description | Status |
+|---------|-------------|--------|
+| Motivation | LLMs cannot serve as persistent state (31.6% stability) | ✅ Complete |
 | Phase 1 | Extraction pipeline & multi-model runs | ✅ Complete |
 | Phase 2 | Semantic stability analysis | ✅ Complete |
-| Phase 3 | Representation comparison & localization | ✅ Complete |
-| Phase 3A | Classical baseline comparison (TF-IDF, RAKE, YAKE) | ✅ Complete |
-| Phase 4 | Downstream sensitivity analysis | 🔜 Planning |
+| §3.1 Localization | Gentags localize drift (1.50× vs embeddings) | ✅ Complete |
+| §3.2 Baselines | Classical methods retain words, not state | ✅ Complete |
+| §3.3 Boundaries | Paraphrase sensitivity (negative result) | ✅ Complete |
+| Phase 4 | Probe sensitivity (pdensity validation) | 🔜 Planning |
 
-### Core Contributions (Validated)
+### Core Thesis
 
-1. **Gentags** — LLMs can externalize latent semantics as discrete, inspectable tags
-2. **Semantic Stability** — Lexically unstable but semantically stable (gap = 0.504)
-3. **Evidence-Sensitive Variability** — Correlation with evidence sparsity (-0.230)
-4. **Model Agreement** — 4 different LLMs produce semantically similar outputs
-5. **State Observability** — Gentags enable localized change attribution (Gini = 0.657 vs 0.361)
-6. **Classical Baseline Comparison** — Gentags beat TF-IDF/RAKE/YAKE on localization (5x higher Gini)
+> Gentags occupy an intermediate point between symbolic keywords and dense embeddings: **semantic enough to generalize, lexical enough to attribute.**
 
-### Key Results
+### Claims
 
-| Metric | Value | Meaning |
-|--------|-------|---------|
-| Cosine (semantic) | 0.977 | High semantic stability |
-| Jaccard (surface) | 0.471 | Expected lexical variation |
-| Gap | 0.504 | Proves lexical ≠ semantic |
-| S4 correlation | -0.230 | More evidence → lower dispersion |
-| Retention delta | +0.164 | Gentags capture meaning |
-| Gentag Gini | 0.657 | Localized change attribution |
-| Embedding Gini | 0.361 | Diffuse (not attributable) |
-| Classical Baseline Gini | 0.12 | Very diffuse (no attribution) |
-| Model-in-loop stability | 31.6% | No persistent state (unstable) |
+| Claim | Evidence | Implication |
+|-------|----------|-------------|
+| LLMs lack persistent state | 31.6% stability | Must externalize semantic state |
+| Gentags localize drift | 1.50× Gini vs embeddings | Inspect ~2-3 tags, not 3072 dims |
+| Keywords retain words, not state | RAKE 0.742 retention but deterministic | Gentags trade overlap for distillation |
+| Gentags are surface-sensitive | MMC 0.648 < 0.80 | Hybrid representation (semantic + lexical) |
 
-See `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` for **complete analysis across all phases**.
-See `docs/PAPER_STRUCTURE.md` for paper outline and contribution hierarchy.
+### Key Numbers
+
+| Metric | Value |
+|--------|-------|
+| Model-in-the-loop stability | 31.6% |
+| Semantic stability (cosine) | 0.977 |
+| Localization Gini (gentags) | 0.553 |
+| Localization Gini (embeddings) | 0.369 |
+| **Localization advantage** | **1.50×** |
+| Paraphrase MMC | 0.648 |
+
+See `docs/SECTION3_REPRESENTATION.md` for the core representation claims.
+See `docs/MOTIVATION.md` for why gentags are necessary.
 
 ---
 
@@ -208,15 +211,10 @@ See `docs/PAPER_STRUCTURE.md` for paper outline and contribution hierarchy.
 
 | Document | Description |
 |----------|-------------|
-| `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` | **Comprehensive report: all phases combined** |
-| `docs/PAPER_STRUCTURE.md` | Paper outline and contribution hierarchy |
-| `docs/STABILITY_ANALYSIS_REPORT.md` | Full Phase 2 results with plots |
-| `docs/PHASE3_ANALYSIS_REPORT.md` | Full Phase 3 results with plots |
-| `docs/PHASE3A_ANALYSIS_REPORT.md` | Classical baseline comparison (TF-IDF, RAKE, YAKE) |
-| `docs/PHASE3A_PLAN.md` | Phase 3A methodology and implementation |
-| `docs/PHASE2_STATUS.md` | Phase 2 completion status |
-| `docs/PHASE3_PLAN.md` | Phase 3 methodology and implementation details |
-| `docs/PHASE4_PLAN.md` | Phase 4 plan: downstream sensitivity analysis |
+| `docs/MOTIVATION.md` | Why gentags exist (31.6% LLM instability) |
+| `docs/PHASE1_EXTRACTION.md` | Multi-model extraction (13,272 extractions) |
+| `docs/PHASE2_STABILITY.md` | Semantic stability analysis |
+| `docs/SECTION3_REPRESENTATION.md` | **Core claims: localization, baselines, boundaries** |
 | `docs/STUDY1_LOCK.md` | Frozen methodology |
 
 ---
