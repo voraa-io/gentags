@@ -11,7 +11,7 @@ Metrics:
 - State-Gini: Gini on facet COUNTS (using hard assignment)
 - Retention: cosine(embed(reviews), embed(representation_text))
 
-Methodology (same as phase3_analysis_v2.py):
+Methodology (same as state_gini_full.py):
 1. For each keyword, embed it
 2. Compute cosine similarity to each facet anchor
 3. Assign to argmax facet (if >= threshold)
@@ -521,7 +521,7 @@ def main():
         gentag_state_gini_std = phase3_df['gentag_state_gini'].std()
         print(f"    Gentag State-Gini: {gentag_state_gini_mean:.3f} +/- {gentag_state_gini_std:.3f}")
     else:
-        print("    Phase 3 results not found. Run phase3_analysis_v2.py first.")
+        print("    Phase 3 results not found. Run state_gini_full.py first.")
         gentag_state_gini_mean = None
         gentag_state_gini_std = None
 

@@ -37,7 +37,7 @@ fi
 echo ""
 echo "[1/2] Running Phase 3: Gentag State-Gini..."
 echo ""
-poetry run python scripts/phase3_analysis_v2.py
+poetry run python scripts/state_gini_full.py
 
 # Run Phase 3A (baseline State-Gini)
 echo ""
