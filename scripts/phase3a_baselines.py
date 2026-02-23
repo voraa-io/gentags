@@ -368,7 +368,17 @@ def load_review_embeddings() -> Dict[str, np.ndarray]:
 
 def main():
     """Run Phase 3A baseline comparison with State-Gini methodology."""
+    import argparse
     import nltk
+
+    parser = argparse.ArgumentParser(description="Phase 3A: Baseline State-Gini (RAKE, TF-IDF, YAKE)")
+    parser.add_argument("--tau", type=float, default=0.35, help="Semantic threshold (match state_gini_full for sensitivity)")
+    parser.add_argument("--output-suffix", type=str, default="", help="Suffix for outputs, e.g. _tau030")
+    parser.add_argument("--gentag-suffix", type=str, default="", help="Suffix of gentag state file to compare, e.g. _tau030")
+    args = parser.parse_args()
+    threshold = args.tau
+    output_suffix = args.output_suffix
+    gentag_suffix = args.gentag_suffix or output_suffix
 
     # Download NLTK data for RAKE
     try:
@@ -383,6 +393,7 @@ def main():
     print("=" * 60)
     print("Phase 3A: Classical Baseline Comparison (v2 - State-Gini)")
     print("=" * 60)
+    print(f"  τ = {threshold}  output_suffix = {output_suffix or '(none)'}")
     print("\nThis version uses STATE-GINI (same methodology as gentags)")
     print("- Hard assignment: each keyword → argmax facet")
     print("- Gini computed on integer counts per facet")
@@ -483,8 +494,8 @@ def main():
             if not kw_embs:
                 continue
 
-            # Compute State-Gini
-            state_gini, counts, other_count = compute_state_gini(kw_embs, anchor_embeddings)
+            # Compute State-Gini (use --tau for sensitivity)
+            state_gini, counts, other_count = compute_state_gini(kw_embs, anchor_embeddings, threshold=threshold)
 
             # Compute retention (for secondary analysis)
             kw_text = " ".join(keywords)
@@ -512,9 +523,9 @@ def main():
 
     baseline_df = pd.DataFrame(results)
 
-    # Load gentag State-Gini from Phase 3 v2
+    # Load gentag State-Gini from Phase 3 (optional; for comparison)
     print("\n[10] Loading gentag State-Gini from Phase 3...")
-    phase3_state_path = Path("results/phase3/tables/state_localization.csv")
+    phase3_state_path = Path(f"results/phase3/tables/state_localization{gentag_suffix}.csv")
     if phase3_state_path.exists():
         phase3_df = pd.read_csv(phase3_state_path)
         gentag_state_gini_mean = phase3_df['gentag_state_gini'].mean()
@@ -526,8 +537,8 @@ def main():
         gentag_state_gini_std = None
 
     # Save results
-    baseline_df.to_csv(TABLES_DIR / "baseline_state_gini.csv", index=False)
-    print(f"\n    Saved {len(baseline_df)} rows to baseline_state_gini.csv")
+    baseline_df.to_csv(TABLES_DIR / f"baseline_state_gini{output_suffix}.csv", index=False)
+    print(f"\n    Saved {len(baseline_df)} rows to baseline_state_gini{output_suffix}.csv")
 
     # Summary
     print("\n" + "=" * 60)
@@ -578,14 +589,14 @@ def main():
         })
 
     summary_df = pd.DataFrame(summary_data)
-    summary_df.to_csv(TABLES_DIR / "state_gini_summary.csv", index=False)
+    summary_df.to_csv(TABLES_DIR / f"state_gini_summary{output_suffix}.csv", index=False)
 
     # Write manifest
     manifest = {
         "phase": "phase3a_v2",
         "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "methodology": "STATE-GINI (Gini on counts, hard assignment)",
-        "threshold": SEMANTIC_THRESHOLD,
+        "threshold": threshold,
         "k_keywords": k,
         "counts": {
             "n_venues": len(venue_keywords),
@@ -601,7 +612,7 @@ def main():
         "facets": FACETS,
     }
 
-    with open(OUTPUT_DIR / "phase3a_v2_manifest.json", 'w') as f:
+    with open(OUTPUT_DIR / f"phase3a_v2_manifest{output_suffix}.json", 'w') as f:
         json.dump(manifest, f, indent=2)
 
     print("\n" + "=" * 60)
