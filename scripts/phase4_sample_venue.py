@@ -198,6 +198,7 @@ def main():
     parser.add_argument("--venue-id", default=None, help="Specific venue ID (default: auto-select sparse)")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Model for primary gentag sample")
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="Prompt type for primary gentag sample")
+    parser.add_argument("--output", default=None, help="Output file path (default: results/phase4/sample_venue.json)")
     parser.add_argument("--list-candidates", action="store_true", help="List sparse venue candidates and exit")
     args = parser.parse_args()
 
@@ -287,11 +288,12 @@ def main():
     }
 
     # --- Write ---
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, "w") as f:
+    out_path = Path(args.output) if args.output else OUTPUT_FILE
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\nOutput: {OUTPUT_FILE}")
+    print(f"\nOutput: {out_path}")
 
     # --- Print summary for quick inspection ---
     print(f"\n{'='*60}")
