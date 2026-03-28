@@ -661,43 +661,176 @@ Zettlemoyer, Luke S., and Michael Collins. 2005. Learning to map sentences to lo
 
 Zhou, Denny, Nathanael Schärli, Le Hou, Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed H. Chi, Quoc V. Le, and Tengyu Ma. 2022. Least-to-most prompting enables complex reasoning in large language models. _arXiv preprint arXiv:2205.10625_.
 
-The appendices provide supporting material for claims summarized in the main text. Appendix A expands the qualitative audit referenced in the decision results and discussion. Appendix B collects supplementary figures for the stability, structural, and decision analyses.
+The appendices provide supporting material for claims summarized in the main text. Appendix A documents the implementation details required for reproducibility. Appendix B expands the qualitative audit referenced in the decision results. Appendix C collects supplementary figures with explanatory context.
 
-## Appendix A: Qualitative Audit of Gentag Failures
+## Appendix A: Implementation Details
+
+This appendix documents the exact prompts, model configurations, decoding settings, validation rules, and frozen lexicons used throughout the experimental pipeline. All parameters were frozen before data collection and not modified during analysis.
+
+### A.1 Extraction Prompts
+
+Three prompt variants are used for gentag extraction. All instruct the model to produce a JSON list of short semantic phrases grounded in the input reviews. They differ in how strongly they constrain grounding and brevity.
+
+**Minimal prompt:**
+
+> Extract semantic tags ("gentags") for this venue based on the reviews. A gentag is a short, meaningful semantic phrase (typically 1–4 words) that captures one idea expressed or strongly implied in the reviews. Include any gentags that describe atmosphere, food, service, vibe, crowd, or typical occasions mentioned in the reviews. Do not invent information beyond what the reviews support. Return only a JSON list of gentags.
+
+**Anti-hallucination prompt:**
+
+> Extract semantic tags ("gentags") for this venue based ONLY on what is explicitly stated or clearly implied in the reviews. A gentag is a short, meaningful semantic phrase (typically 1–4 words) that captures a single idea grounded in the review text. It must not be a full sentence. Do NOT infer, assume, generalize, or guess any information that is not directly supported by the reviews. If a concept is uncertain, ambiguous, or weakly implied, do NOT include it as a gentag. Include only gentags that reflect concrete statements in the reviews. Return only a JSON list of gentags.
+
+**Short-phrase prompt:**
+
+> Extract semantic tags ("gentags") for this venue that summarize the key ideas expressed in the reviews. A gentag must be a short phrase of 1–4 words that represents one clear semantic idea. Do not produce full sentences. Tags must be grounded in the content of the reviews and should not rely on assumptions or outside knowledge. Return only a JSON list of short gentags.
+
+### A.2 System Prompts
+
+| Provider | System Prompt |
+|----------|---------------|
+| OpenAI, Grok | `"You extract only JSON lists of gentags based on reviews. No explanations."` |
+| Gemini, Claude | None (user prompt only) |
+
+### A.3 Extractor Models
+
+| Key | Model ID | Provider | Input $/Mtok | Output $/Mtok |
+|-----|----------|----------|-------------|---------------|
+| openai | `gpt-5-nano` | OpenAI | $0.05 | $0.40 |
+| gemini | `gemini-2.5-flash` | Google | $0.25 | $0.50 |
+| claude | `claude-sonnet-4-5` | Anthropic | $3.00 | $15.00 |
+| grok | `grok-4` | xAI | $2.00 | $10.00 |
+
+**Decoding settings for extraction:** Temperature, top_p, and max_tokens are not overridden (provider defaults), except Claude which requires an explicit max_tokens (set to 8192).
+
+### A.4 Output Parsing and Validation
+
+Extraction responses are parsed using three fallback strategies in order:
+
+1. Direct `json.loads()` on the raw response
+2. Strip markdown code-fence wrappers (` ```json ... ``` `) and retry
+3. Extract the first balanced `[...]` bracket sequence using depth-first bracket tracking
+
+After parsing, tags exceeding 4 words are moved to a `tags_filtered_out` field. Empty and whitespace-only tags are stripped. If all three parsing strategies fail, the extraction is marked `parse_error`. There is no automatic retry.
+
+### A.5 Judge Prompts
+
+**Tag-based systems** (gentag, rake, yake, tfidf, gentag_truncated):
+
+> You are a strict Decision Judge.
+>
+> Use ONLY the provided tags. Do NOT use external knowledge. Do NOT infer facts not present in the tags. Treat synonyms as NOT present unless they appear exactly in the tag list.
+>
+> Decision rules:
+> - If the persona has a hard requirement and the requirement is VIOLATED based on the provided indicator set, output REJECT.
+> - If the persona has a hard requirement and the requirement is SATISFIED, do NOT reject unless other clear blockers exist.
+> - RECOMMEND if tags contain clear supports AND no clear blockers.
+> - BORDERLINE if tags are mixed or ambiguous.
+> - If the persona has no hard requirement, weigh all relevant tags.
+>
+> Return ONE line of valid JSON and nothing else:
+> `{"decision":"REJECT|BORDERLINE|RECOMMEND","requirement_status":"SATISFIED|VIOLATED|NOT_APPLICABLE","blockers":["..."],"supports":["..."],"tags_used":["..."],"justification":"one sentence"}`
+>
+> Strict rules:
+> - tags_used MUST be a subset of the provided tags (exact string match).
+> - blockers and supports MUST be subsets of tags_used.
+> - If you cite a tag not in the provided list, the response is INVALID.
+
+**Full-Evidence Reference (FER):**
+
+The FER prompt follows the same decision rules but replaces "tags" with "reviews" and requires `evidence_quotes` (short quotes from reviews) instead of `tags_used`.
+
+### A.6 Judge Models and Decoding
+
+| Judge | Model ID | Input $/Mtok | Output $/Mtok |
+|-------|----------|-------------|---------------|
+| Primary | `gpt-4o-2024-08-06` | $2.50 | $10.00 |
+| Cross-validation | `claude-sonnet-4-20250514` | $3.00 | $15.00 |
+
+**Decoding settings:** Temperature and top_p use provider defaults. Max output tokens: 512 (hardcoded for judge responses).
+
+### A.7 Persona Indicator Lexicons
+
+Hard requirements use frozen exact-match indicator sets. The judge checks whether any tag in the representation exactly matches an entry in the corresponding set.
+
+**P1 Food Critic** (`negative_present_rejects`):
+- Positive: `delicious food`, `good food`, `excellent food`, `great food`, `quality food`, `fresh food`, `tasty food`, `amazing food`, `fresh ingredients`, `well-prepared food`, `flavorful food`, `outstanding cuisine`, `authentic flavor`
+- Negative: `bad food`, `inconsistent food`, `poor food quality`, `cold food`, `undercooked`, `overcooked`, `raw and burnt`, `tasteless`, `bland food`, `stale food`, `low quality food`, `terrible food`, `disgusting food`, `flavorless`
+
+**P2 Sports Fan** (`indicator_present_not_reject`):
+- `watching game`, `watch games`, `watching sport`, `live sports`, `sports bar`, `sport bar`, `big screen`, `big screen sport`, `screen everywhere`, `game night`, `game-day vibe`, `sports viewing`, `favorite sport bar`, `large screen`, `TVs for sports`, `live game viewing`
+
+**P3 Quick Lunch Worker** (`indicator_present_not_reject`):
+- `fast service`, `quick service`, `quick bite`, `speedy service`, `rapid service`, `efficient service`, `fast food`, `prompt service`, `short wait`, `fast counter service`, `no wait`, `minimal wait`, `swift service`, `quick lunch`
+
+**P4 Balanced Diner:** No hard requirement. Soft factors: food quality, service quality, ambiance.
+
+### A.8 Facet Anchors (Phase 3)
+
+State-Gini analysis uses 10 frozen diagnostic facets. Tags are embedded with `text-embedding-3-large` (OpenAI, 3072 dimensions) and assigned to their closest facet anchor if cosine similarity ≥ τ (default 0.35).
+
+| Facet | Anchor phrase |
+|-------|---------------|
+| food_quality | food quality, taste, freshness, delicious meals |
+| coffee_drinks | coffee, espresso, latte, beverages, drinks |
+| service | service quality, staff friendliness, speed, waiters |
+| ambiance | atmosphere, ambiance, vibe, decor, cozy environment |
+| price_value | price, value for money, affordable, expensive |
+| crowding | crowded, busy, wait times, lines, availability |
+| seating | seating, tables, outdoor patio, indoor space |
+| dietary | dietary options, vegan, vegetarian, gluten-free |
+| portions | portion size, generous servings, filling meals |
+| location | location, parking, accessibility, neighborhood |
+
+### A.9 Aggregation and Scoring
+
+Each Phase 5 condition (venue × persona × system) is evaluated with N = 5 repeated judge calls. Aggregation uses majority voting on the `decision` field. A minimum of 3 valid responses is required; conditions with fewer valid responses are marked `UNSCORABLE`. Ties are broken to `BORDERLINE`.
+
+---
+
+## Appendix B: Qualitative Audit of Gentag Failures
 
 Out of 200 Gentag conditions (50 venues × 4 personas), Gentags disagree with FER in 41 cases. Most disagreements are one-step moves through `BORDERLINE` (33/41, 80.5%) rather than direct reversals (8/41, 19.5%). Disagreements concentrate in mixed-evidence personas: P1 Food Critic (24/41) and P4 Balanced Diner (11/41).
 
 The disagreement set supports a four-part failure-mode taxonomy:
 
-- **FM1. Borderline Drift Under Mixed Evidence (33/41).** Gentags preserve both positive and negative propositions, and the judge falls back to BORDERLINE rather than committing.
-- **FM2. Exact-Match Indicator Misses (4/41).** Semantically relevant support exists (e.g., `fast delivery`, `game audio`) but the frozen exact-match indicator lexicon does not recognize it.
-- **FM3. Positive-Cue Anchoring (2/41).** An exact positive indicator overrides contradictory negative evidence in the state.
-- **FM4. Missed Negative Cue (2/41).** Negative semantics are present in the state but not surfaced in the decision.
+- **FM1. Borderline Drift Under Mixed Evidence (33/41).** Gentags preserve both positive and negative propositions, and the judge falls back to BORDERLINE rather than committing. This is the dominant failure mode and reflects uncertainty induced by compressed propositional state under mixed evidence.
+- **FM2. Exact-Match Indicator Misses (4/41).** Semantically relevant support exists (e.g., `fast delivery`, `game audio`) but the frozen exact-match indicator lexicon does not recognize it. This is partly a protocol artifact: the evaluation rule does not recognize semantically equivalent but lexically different tags.
+- **FM3. Positive-Cue Anchoring (2/41).** An exact positive indicator (e.g., `efficient service`) overrides contradictory negative evidence (`slow service`) in the same state. This suggests a concrete extension: conflict-aware state resolution.
+- **FM4. Missed Negative Cue (2/41).** Negative semantics (`hygiene concern`, `unsanitary practice`) are present in the state but not surfaced in the decision. The representation preserves the relevant cue, but the downstream judge does not use it.
 
-![Figure A9: Gentag–FER disagreement audit. Left: mismatch types (80.5% one-step drift, 19.5% full reversals). Right: concentration by persona.](../results/phase5/plots/4_failure_audit.png)
+![Figure B1: Gentag–FER disagreement audit. Left: mismatch types (80.5% one-step drift, 19.5% full reversals). Right: concentration by persona.](../results/phase5/plots/4_failure_audit.png)
 
-The audit shows that remaining errors are structured rather than arbitrary. Several exact reversals are protocol artifacts (frozen indicator lexicons) rather than representational failures.
+The audit shows that remaining errors are structured rather than arbitrary. Several exact reversals are protocol artifacts (frozen indicator lexicons) rather than representational failures. This sharpens the discussion: the dominant residual error is mixed-evidence drift, not hallucination or extraction failure.
 
 ---
 
-## Appendix B: Additional Figures
+## Appendix C: Supplementary Figures
 
-This appendix collects supplementary figures that support the main empirical trends reported in Section 5 but are not required for the central argument in the main paper.
+This appendix collects supplementary figures that support the main empirical trends reported in Section 5. Each subsection provides brief context for the corresponding plots.
 
-### B.1 Stability
+### C.1 Stability (Phase 2)
 
-![Figure A1: Cross-prompt semantic similarity heatmaps by model.](../results/phase2/plots/2_prompt_sensitivity.png)
+Figures C1 and C2 confirm that the semantic stability reported in Section 5.1 holds across individual prompt variants and model pairs. Cross-prompt cosine similarity remains above 0.95 for all models (Figure C1), and cross-model cosine exceeds 0.94 for all prompt types (Figure C2). These figures support the main-paper claim that the recovered semantic state is not sensitive to the specific extraction configuration.
 
-![Figure A2: Cross-model semantic similarity heatmaps by prompt.](../results/phase2/plots/3_model_sensitivity.png)
+![Figure C1: Cross-prompt semantic similarity heatmaps by model. All prompt pairs show cosine > 0.95.](../results/phase2/plots/2_prompt_sensitivity.png)
 
-![Figure A3: Source retention by model and prompt.](../results/phase2/plots/4_retention.png)
+![Figure C2: Cross-model semantic similarity heatmaps by prompt. All model pairs show cosine > 0.94.](../results/phase2/plots/3_model_sensitivity.png)
 
-### B.2 Structure
+Figure C3 shows source retention cosine by model and prompt. Retention measures how well the gentag state preserves the semantic content of the original reviews. All models achieve retention above the random baseline (+0.164), with Claude showing the highest median retention.
 
-![Figure A5: Threshold sensitivity — State-Gini and other-rate across τ = {0.30, 0.35, 0.40}.](../results/phase3/plots/2_threshold_sensitivity.png)
+![Figure C3: Source retention by model and prompt.](../results/phase2/plots/4_retention.png)
 
-![Figure A6: Per-facet distribution by method (% of total semantic units).](../results/phase3/plots/3_facet_heatmap.png)
+### C.2 Structure (Phase 3)
 
-### B.3 Decision
+Figure C4 shows that the structural advantage reported in Section 5.2 is robust to threshold choice. At all three tested thresholds (τ = 0.30, 0.35, 0.40), gentags retain more semantic mass within the facet inventory and show lower State-Gini than lexical baselines. The coverage gap widens at stricter thresholds, where baselines lose most of their assigned mass.
 
-![Figure A8: Cross-judge Cohen's kappa by system. All systems show substantial agreement (κ > 0.6).](../results/phase5/plots/3_cross_judge_kappa.png)
+![Figure C4: Threshold sensitivity — State-Gini and other-rate across τ = {0.30, 0.35, 0.40}.](../results/phase3/plots/2_threshold_sensitivity.png)
+
+Figure C5 shows how each method distributes its semantic units across the 10 diagnostic facets. Gentags spread mass across food_quality, service, ambiance, and other facets, while lexical baselines concentrate in the "other" bucket (67–69% of mass unassigned). This directly visualizes the facet-coverage advantage discussed in Section 5.2.1.
+
+![Figure C5: Per-facet distribution by method (% of total semantic units, τ = 0.35).](../results/phase3/plots/3_facet_heatmap.png)
+
+### C.3 Decision (Phase 5)
+
+Figure C6 shows cross-judge agreement (Cohen's kappa) by system. The overall kappa of 0.712 indicates substantial agreement between the two judge models. Gentag, FER, and gentag_truncated show the most stable cross-judge agreement, while TF-IDF and YAKE show slightly lower kappa, consistent with fragment-based representations being harder to interpret consistently across different judge models.
+
+![Figure C6: Cross-judge Cohen's kappa by system. All systems show substantial agreement (κ > 0.6). Overall κ = 0.712.](../results/phase5/plots/3_cross_judge_kappa.png)
