@@ -1,19 +1,17 @@
 """
-Phase 5 — Baseline Legibility Analysis.
+Phase 5 — Baseline Legibility Analysis (v2).
 
 Computes all metrics from the baseline legibility study:
-  A) Baseline decision distribution (floor rate)
-  B) Hard requirement compliance (P2/P3)
+  A) Baseline decision distribution (floor rate) — 6 systems x 4 personas
+  B) Hard requirement compliance (P1/P2/P3 with frozen indicator lexicons)
   C) FER agreement (exact match, Cohen's kappa, disagreement direction)
-  D) Token-budget ablation (truncated gentag vs RAKE)
-  E) Floor rate replication (Phase 4 finding)
-  F) Decision entropy (distribution skew vs FER reference)
-
-Reuses wilson_ci() and fishers_exact_test() from phase4_aggregate.py.
+  D) Token-budget ablation (truncated gentag vs all keyword baselines)
+  E) Decision entropy (distribution skew vs FER reference)
+  F) Cross-judge comparison (if two summary files provided)
 
 Usage:
-    poetry run python scripts/phase5_analyze.py --summary results/phase5/baseline_summary_XXXXXX.json
-    poetry run python scripts/phase5_analyze.py --summary results/phase5/baseline_summary_XXXXXX.json --venues data/phase5/sampled_venues.json
+    poetry run python scripts/phase5_analyze.py --summary results/phase5/baseline_summary_openai_XXXXX.json
+    poetry run python scripts/phase5_analyze.py --summary results/phase5/baseline_summary_openai_XXXXX.json --summary2 results/phase5/baseline_summary_claude_XXXXX.json
 """
 
 import argparse
@@ -23,17 +21,22 @@ from math import log2, sqrt
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Paths
+# Paths & constants
 # ---------------------------------------------------------------------------
 REPO = Path(__file__).resolve().parent.parent
 VENUES_FILE = REPO / "data" / "phase5" / "sampled_venues.json"
+PERSONAS_FILE = REPO / "data" / "phase5" / "phase5_personas.json"
 OUTPUT_DIR = REPO / "results" / "phase5"
 
 DECISION_ORDINALS = {"REJECT": 0, "BORDERLINE": 1, "RECOMMEND": 2}
+TAG_SYSTEMS = ["gentag", "rake", "yake", "tfidf", "gentag_truncated"]
+ALL_SYSTEMS = TAG_SYSTEMS + ["fer"]
+HARD_PERSONAS = ["P1", "P2", "P3"]
+ALL_PERSONAS = ["P1", "P2", "P3", "P4"]
 
 
 # ---------------------------------------------------------------------------
-# Reused from phase4_aggregate.py
+# Stats functions
 # ---------------------------------------------------------------------------
 def wilson_ci(successes: int, total: int, z: float = 1.96) -> dict:
     if total == 0:
@@ -46,23 +49,14 @@ def wilson_ci(successes: int, total: int, z: float = 1.96) -> dict:
         "point": round(p, 4),
         "lower": round(max(0, centre - spread), 4),
         "upper": round(min(1, centre + spread), 4),
-        "n": total,
-        "k": successes,
+        "n": total, "k": successes,
     }
 
 
 def fishers_exact_test(a, b, c, d):
-    """2x2 contingency table Fisher's exact test.
-    Table:
-        | success | fail |
-    row1|    a    |  b   |
-    row2|    c    |  d   |
-    Returns p-value (two-sided).
-    """
     try:
         from scipy.stats import fisher_exact
-        table = [[a, b], [c, d]]
-        _, p = fisher_exact(table, alternative="two-sided")
+        _, p = fisher_exact([[a, b], [c, d]], alternative="two-sided")
         return round(p, 6)
     except ImportError:
         from math import comb
@@ -70,87 +64,37 @@ def fishers_exact_test(a, b, c, d):
         row1 = a + b
         col1 = a + c
         col2 = b + d
-
         def hypergeom_pmf(k):
             return comb(col1, k) * comb(col2, row1 - k) / comb(n, row1)
-
         p_obs = hypergeom_pmf(a)
-        p_value = 0.0
-        for k in range(max(0, row1 - col2), min(row1, col1) + 1):
-            p_k = hypergeom_pmf(k)
-            if p_k <= p_obs + 1e-10:
-                p_value += p_k
+        p_value = sum(hypergeom_pmf(k)
+                      for k in range(max(0, row1 - col2), min(row1, col1) + 1)
+                      if hypergeom_pmf(k) <= p_obs + 1e-10)
         return round(min(p_value, 1.0), 6)
 
 
-# ---------------------------------------------------------------------------
-# Cohen's Kappa
-# ---------------------------------------------------------------------------
 def cohens_kappa(labels_a: list, labels_b: list) -> float:
-    """Compute Cohen's kappa for two lists of categorical labels."""
-    assert len(labels_a) == len(labels_b)
     n = len(labels_a)
     if n == 0:
         return 0.0
-
     categories = sorted(set(labels_a) | set(labels_b))
-    # Observed agreement
     po = sum(1 for a, b in zip(labels_a, labels_b) if a == b) / n
-
-    # Expected agreement
-    pe = 0.0
-    for cat in categories:
-        pa = sum(1 for a in labels_a if a == cat) / n
-        pb = sum(1 for b in labels_b if b == cat) / n
-        pe += pa * pb
-
+    pe = sum((sum(1 for a in labels_a if a == c) / n) *
+             (sum(1 for b in labels_b if b == c) / n) for c in categories)
     if pe == 1.0:
         return 1.0
     return round((po - pe) / (1 - pe), 4)
 
 
-# ---------------------------------------------------------------------------
-# Chi-squared test (2xK)
-# ---------------------------------------------------------------------------
-def chi_squared_test(observed: list, expected: list) -> dict:
-    """Simple chi-squared goodness of fit."""
-    chi2 = 0.0
-    for o, e in zip(observed, expected):
-        if e > 0:
-            chi2 += (o - e) ** 2 / e
-    df = len(observed) - 1
-    # Approximate p-value using chi2 CDF (fallback for no scipy)
-    try:
-        from scipy.stats import chi2 as chi2_dist
-        p = 1 - chi2_dist.cdf(chi2, df)
-    except ImportError:
-        p = None  # Can't compute without scipy
-    return {"chi2": round(chi2, 4), "df": df, "p_value": round(p, 6) if p is not None else None}
-
-
-# ---------------------------------------------------------------------------
-# Decision entropy
-# ---------------------------------------------------------------------------
 def decision_entropy(decisions: list) -> float:
-    """Shannon entropy over {REJECT, BORDERLINE, RECOMMEND} distribution.
-
-    Max entropy = log2(3) ≈ 1.585 (uniform).
-    Zero entropy = all decisions the same.
-    """
     n = len(decisions)
     if n == 0:
         return 0.0
     counts = Counter(decisions)
-    h = 0.0
-    for c in counts.values():
-        p = c / n
-        if p > 0:
-            h -= p * log2(p)
-    return round(h, 4)
+    return round(-sum((c/n) * log2(c/n) for c in counts.values() if c > 0), 4)
 
 
 def normalized_entropy(decisions: list) -> float:
-    """Entropy normalized to [0, 1] by dividing by log2(3)."""
     max_h = log2(3)
     return round(decision_entropy(decisions) / max_h, 4) if max_h > 0 else 0.0
 
@@ -162,150 +106,130 @@ def load_summary(path: str) -> list:
     with open(path) as f:
         return json.load(f)
 
-
 def load_venues(path: str) -> dict:
     with open(path) as f:
         data = json.load(f)
     return {v["venue_id"]: v for v in data["venues"]}
 
+def load_personas(path: str) -> dict:
+    with open(path) as f:
+        return {p["persona_id"]: p for p in json.load(f)}
+
 
 # ---------------------------------------------------------------------------
-# A) Baseline Decision Distribution
+# A) Decision Distribution
 # ---------------------------------------------------------------------------
 def compute_decision_distribution(summary: list) -> dict:
-    """Decision counts per system and per system-persona."""
     results = {}
+    systems = sorted(set(r["system"] for r in summary))
+    personas = sorted(set(r["persona_id"] for r in summary))
 
-    for system in ["gentag", "rake", "gentag_truncated", "fer"]:
+    for system in systems:
         sys_rows = [r for r in summary if r["system"] == system]
         total = len(sys_rows)
         counts = Counter(r["decision"] for r in sys_rows)
         rej = counts.get("REJECT", 0)
 
-        results[system] = {
-            "total": total,
-            "REJECT": rej,
-            "BORDERLINE": counts.get("BORDERLINE", 0),
-            "RECOMMEND": counts.get("RECOMMEND", 0),
-            "UNSCORABLE": counts.get("UNSCORABLE", 0),
-            "floor_rate": wilson_ci(rej, total),
-        }
-
-        # Per-persona breakdown
         per_persona = {}
-        for pid in ["P1", "P2", "P3"]:
+        for pid in personas:
             p_rows = [r for r in sys_rows if r["persona_id"] == pid]
             p_total = len(p_rows)
             p_counts = Counter(r["decision"] for r in p_rows)
             p_rej = p_counts.get("REJECT", 0)
             per_persona[pid] = {
-                "total": p_total,
-                "REJECT": p_rej,
+                "total": p_total, "REJECT": p_rej,
                 "BORDERLINE": p_counts.get("BORDERLINE", 0),
                 "RECOMMEND": p_counts.get("RECOMMEND", 0),
                 "UNSCORABLE": p_counts.get("UNSCORABLE", 0),
                 "floor_rate": wilson_ci(p_rej, p_total),
             }
-        results[system]["per_persona"] = per_persona
 
+        results[system] = {
+            "total": total, "REJECT": rej,
+            "BORDERLINE": counts.get("BORDERLINE", 0),
+            "RECOMMEND": counts.get("RECOMMEND", 0),
+            "UNSCORABLE": counts.get("UNSCORABLE", 0),
+            "floor_rate": wilson_ci(rej, total),
+            "per_persona": per_persona,
+        }
     return results
 
 
 # ---------------------------------------------------------------------------
 # B) Hard Requirement Compliance
 # ---------------------------------------------------------------------------
-def compute_hard_requirement_compliance(summary: list, venues: dict) -> dict:
-    """
-    P2: has_game_tag=False → expected REJECT; True → expected NOT-REJECT
-    P3: has_speed_tag=False → expected REJECT; True → expected NOT-REJECT
-    P1: no hard binary requirement (control)
-    """
+def compute_hard_requirement_compliance(summary: list, venues: dict, personas: dict) -> dict:
     results = {}
+    systems = sorted(set(r["system"] for r in summary))
 
-    for system in ["gentag", "rake", "gentag_truncated", "fer"]:
+    for system in systems:
         sys_rows = [r for r in summary if r["system"] == system]
+        system_results = {}
 
-        # P2 compliance
-        p2_rows = [r for r in sys_rows if r["persona_id"] == "P2"]
-        p2_correct = 0
-        p2_total = 0
-        p2_details = []
-        for r in p2_rows:
-            v = venues.get(r["venue_id"], {})
-            has_game = v.get("has_game_tag", False)
-            decision = r["decision"]
-            if decision == "UNSCORABLE":
-                continue
-            p2_total += 1
-            if not has_game:
-                # Expected REJECT
-                correct = (decision == "REJECT")
-            else:
-                # Expected NOT-REJECT
-                correct = (decision != "REJECT")
-            if correct:
-                p2_correct += 1
-            p2_details.append({
-                "venue_id": r["venue_id"],
-                "has_game_tag": has_game,
-                "decision": decision,
-                "expected": "REJECT" if not has_game else "NOT-REJECT",
+        for pid in HARD_PERSONAS:
+            persona = personas.get(pid, {})
+            rule = persona.get("requirement_rule", "")
+            p_rows = [r for r in sys_rows if r["persona_id"] == pid]
+
+            correct = 0
+            total = 0
+
+            for r in p_rows:
+                v = venues.get(r["venue_id"], {})
+                decision = r["decision"]
+                if decision == "UNSCORABLE":
+                    continue
+                total += 1
+
+                if pid == "P1":
+                    has_neg = v.get("has_negative_food_tag", False)
+                    if has_neg:
+                        ok = (decision == "REJECT")
+                    else:
+                        ok = True  # no negative → any decision acceptable
+                elif pid == "P2":
+                    has_game = v.get("has_game_tag", False)
+                    if has_game:
+                        ok = (decision != "REJECT")
+                    else:
+                        ok = (decision == "REJECT")
+                elif pid == "P3":
+                    has_speed = v.get("has_speed_tag", False)
+                    if has_speed:
+                        ok = (decision != "REJECT")
+                    else:
+                        ok = (decision == "REJECT")
+                else:
+                    continue
+
+                if ok:
+                    correct += 1
+
+            system_results[pid] = {
                 "correct": correct,
-            })
+                "total": total,
+                "compliance": wilson_ci(correct, total),
+            }
 
-        # P3 compliance
-        p3_rows = [r for r in sys_rows if r["persona_id"] == "P3"]
-        p3_correct = 0
-        p3_total = 0
-        p3_details = []
-        for r in p3_rows:
-            v = venues.get(r["venue_id"], {})
-            has_speed = v.get("has_speed_tag", False)
-            decision = r["decision"]
-            if decision == "UNSCORABLE":
-                continue
-            p3_total += 1
-            if not has_speed:
-                correct = (decision == "REJECT")
-            else:
-                correct = (decision != "REJECT")
-            if correct:
-                p3_correct += 1
-            p3_details.append({
-                "venue_id": r["venue_id"],
-                "has_speed_tag": has_speed,
-                "decision": decision,
-                "expected": "REJECT" if not has_speed else "NOT-REJECT",
-                "correct": correct,
-            })
-
-        results[system] = {
-            "P2": {
-                "correct": p2_correct,
-                "total": p2_total,
-                "compliance": wilson_ci(p2_correct, p2_total),
-                "details": p2_details,
-            },
-            "P3": {
-                "correct": p3_correct,
-                "total": p3_total,
-                "compliance": wilson_ci(p3_correct, p3_total),
-                "details": p3_details,
-            },
-            "combined": {
-                "correct": p2_correct + p3_correct,
-                "total": p2_total + p3_total,
-                "compliance": wilson_ci(p2_correct + p3_correct, p2_total + p3_total),
-            },
+        # Combined P1+P2+P3
+        combined_correct = sum(system_results[p]["correct"] for p in HARD_PERSONAS)
+        combined_total = sum(system_results[p]["total"] for p in HARD_PERSONAS)
+        system_results["combined"] = {
+            "correct": combined_correct,
+            "total": combined_total,
+            "compliance": wilson_ci(combined_correct, combined_total),
         }
 
-    # Fisher's exact: gentag vs rake compliance
-    gt_correct = results["gentag"]["combined"]["correct"]
-    gt_wrong = results["gentag"]["combined"]["total"] - gt_correct
-    rk_correct = results["rake"]["combined"]["correct"]
-    rk_wrong = results["rake"]["combined"]["total"] - rk_correct
-    results["fisher_gentag_vs_rake"] = fishers_exact_test(
-        gt_correct, gt_wrong, rk_correct, rk_wrong)
+        results[system] = system_results
+
+    # Fisher's: gentag vs each baseline
+    gt = results.get("gentag", {}).get("combined", {})
+    for baseline in ["rake", "yake", "tfidf"]:
+        bl = results.get(baseline, {}).get("combined", {})
+        if gt and bl:
+            results[f"fisher_gentag_vs_{baseline}"] = fishers_exact_test(
+                gt["correct"], gt["total"] - gt["correct"],
+                bl["correct"], bl["total"] - bl["correct"])
 
     return results
 
@@ -314,79 +238,51 @@ def compute_hard_requirement_compliance(summary: list, venues: dict) -> dict:
 # C) FER Agreement
 # ---------------------------------------------------------------------------
 def compute_fer_agreement(summary: list) -> dict:
-    """Compare each system's decisions against FER decisions."""
-    # Build FER lookup: (venue_id, persona_id) -> decision
     fer_decisions = {}
     for r in summary:
         if r["system"] == "fer":
             fer_decisions[(r["venue_id"], r["persona_id"])] = r["decision"]
 
     results = {}
-    for system in ["gentag", "rake", "gentag_truncated"]:
+    for system in TAG_SYSTEMS:
         sys_rows = [r for r in summary if r["system"] == system]
-
-        matches = 0
-        total = 0
+        matches = total = upgrades = downgrades = 0
         sys_labels = []
         fer_labels = []
-        upgrades = 0  # system decision > FER decision
-        downgrades = 0  # system decision < FER decision
-        details = []
 
         for r in sys_rows:
-            key = (r["venue_id"], r["persona_id"])
-            fer_dec = fer_decisions.get(key)
+            fer_dec = fer_decisions.get((r["venue_id"], r["persona_id"]))
             sys_dec = r["decision"]
-
-            if fer_dec is None or fer_dec == "UNSCORABLE" or sys_dec == "UNSCORABLE":
+            if not fer_dec or fer_dec == "UNSCORABLE" or sys_dec == "UNSCORABLE":
                 continue
-
             total += 1
             sys_labels.append(sys_dec)
             fer_labels.append(fer_dec)
-
             if sys_dec == fer_dec:
                 matches += 1
-                direction = "match"
+            elif DECISION_ORDINALS.get(sys_dec, -1) > DECISION_ORDINALS.get(fer_dec, -1):
+                upgrades += 1
             else:
-                sys_ord = DECISION_ORDINALS.get(sys_dec, -1)
-                fer_ord = DECISION_ORDINALS.get(fer_dec, -1)
-                if sys_ord > fer_ord:
-                    upgrades += 1
-                    direction = "upgrade"
-                else:
-                    downgrades += 1
-                    direction = "downgrade"
-
-            details.append({
-                "venue_id": r["venue_id"],
-                "persona_id": r["persona_id"],
-                "system_decision": sys_dec,
-                "fer_decision": fer_dec,
-                "direction": direction,
-            })
+                downgrades += 1
 
         kappa = cohens_kappa(sys_labels, fer_labels) if total > 0 else None
-
         results[system] = {
-            "matches": matches,
-            "total": total,
+            "matches": matches, "total": total,
             "agreement_rate": wilson_ci(matches, total),
             "kappa": kappa,
-            "upgrades": upgrades,
-            "downgrades": downgrades,
+            "upgrades": upgrades, "downgrades": downgrades,
             "upgrade_rate": wilson_ci(upgrades, total),
             "downgrade_rate": wilson_ci(downgrades, total),
-            "details": details,
         }
 
-    # Fisher's exact: gentag agreement vs rake agreement
-    gt_match = results["gentag"]["matches"]
-    gt_miss = results["gentag"]["total"] - gt_match
-    rk_match = results["rake"]["matches"]
-    rk_miss = results["rake"]["total"] - rk_match
-    results["fisher_gentag_vs_rake"] = fishers_exact_test(
-        gt_match, gt_miss, rk_match, rk_miss)
+    # Fisher's: gentag vs each keyword baseline
+    for baseline in ["rake", "yake", "tfidf"]:
+        gt = results.get("gentag", {})
+        bl = results.get(baseline, {})
+        if gt and bl:
+            results[f"fisher_gentag_vs_{baseline}"] = fishers_exact_test(
+                gt["matches"], gt["total"] - gt["matches"],
+                bl["matches"], bl["total"] - bl["matches"])
 
     return results
 
@@ -395,111 +291,36 @@ def compute_fer_agreement(summary: list) -> dict:
 # D) Token-Budget Ablation
 # ---------------------------------------------------------------------------
 def compute_ablation(summary: list) -> dict:
-    """Compare gentag_truncated vs RAKE floor rates."""
+    results = {}
     trunc_rows = [r for r in summary if r["system"] == "gentag_truncated"]
-    rake_rows = [r for r in summary if r["system"] == "rake"]
-
     trunc_rej = sum(1 for r in trunc_rows if r["decision"] == "REJECT")
-    rake_rej = sum(1 for r in rake_rows if r["decision"] == "REJECT")
-    trunc_total = len(trunc_rows)
-    rake_total = len(rake_rows)
+    trunc_rate = wilson_ci(trunc_rej, len(trunc_rows))
 
-    trunc_rate = wilson_ci(trunc_rej, trunc_total)
-    rake_rate = wilson_ci(rake_rej, rake_total)
-
-    gap_pp = round((trunc_rate["point"] - rake_rate["point"]) * 100, 1)
-    fisher_p = fishers_exact_test(trunc_rej, trunc_total - trunc_rej,
-                                   rake_rej, rake_total - rake_rej)
-
-    # Per-persona
-    per_persona = {}
-    for pid in ["P1", "P2", "P3"]:
-        t_rows = [r for r in trunc_rows if r["persona_id"] == pid]
-        r_rows = [r for r in rake_rows if r["persona_id"] == pid]
-        t_rej = sum(1 for r in t_rows if r["decision"] == "REJECT")
-        r_rej = sum(1 for r in r_rows if r["decision"] == "REJECT")
-        per_persona[pid] = {
-            "truncated_floor": wilson_ci(t_rej, len(t_rows)),
-            "rake_floor": wilson_ci(r_rej, len(r_rows)),
-            "gap_pp": round((t_rej/len(t_rows) - r_rej/len(r_rows)) * 100, 1)
-                      if t_rows and r_rows else None,
+    for baseline in ["rake", "yake", "tfidf"]:
+        bl_rows = [r for r in summary if r["system"] == baseline]
+        bl_rej = sum(1 for r in bl_rows if r["decision"] == "REJECT")
+        bl_rate = wilson_ci(bl_rej, len(bl_rows))
+        gap = round((trunc_rate["point"] - bl_rate["point"]) * 100, 1)
+        fisher_p = fishers_exact_test(trunc_rej, len(trunc_rows) - trunc_rej,
+                                       bl_rej, len(bl_rows) - bl_rej)
+        results[baseline] = {
+            "truncated_floor": trunc_rate,
+            "baseline_floor": bl_rate,
+            "gap_pp": gap,
+            "fisher_p": fisher_p,
         }
 
-    return {
-        "truncated_floor_rate": trunc_rate,
-        "rake_floor_rate": rake_rate,
-        "gap_pp": gap_pp,
-        "fisher_p": fisher_p,
-        "interpretation": (
-            "truncated gentag still beats RAKE → advantage is semantics, not volume"
-            if gap_pp < 0 else
-            "truncated gentag ≈ RAKE → advantage may be volume, not semantics"
-            if abs(gap_pp) < 5 else
-            "truncated gentag worse than RAKE → unexpected"
-        ),
-        "per_persona": per_persona,
-    }
+    return results
 
 
 # ---------------------------------------------------------------------------
-# E) Floor Rate Replication
-# ---------------------------------------------------------------------------
-def compute_floor_replication(summary: list) -> dict:
-    """Does Phase 4 finding replicate: gentag floor < RAKE floor?"""
-    gentag_rows = [r for r in summary if r["system"] == "gentag"]
-    rake_rows = [r for r in summary if r["system"] == "rake"]
-
-    gt_rej = sum(1 for r in gentag_rows if r["decision"] == "REJECT")
-    rk_rej = sum(1 for r in rake_rows if r["decision"] == "REJECT")
-    gt_total = len(gentag_rows)
-    rk_total = len(rake_rows)
-
-    gt_rate = wilson_ci(gt_rej, gt_total)
-    rk_rate = wilson_ci(rk_rej, rk_total)
-
-    gap_pp = round((gt_rate["point"] - rk_rate["point"]) * 100, 1)
-    fisher_p = fishers_exact_test(gt_rej, gt_total - gt_rej,
-                                   rk_rej, rk_total - rk_rej)
-
-    # Verdict
-    abs_gap = abs(gap_pp)
-    if gap_pp < -15:
-        verdict = "PAPER-READY"
-    elif gap_pp < -5:
-        verdict = "PROMISING"
-    elif gap_pp < 5:
-        verdict = "FAIL (no significant gap)"
-    else:
-        verdict = "FAIL (reversed)"
-
-    return {
-        "gentag_floor_rate": gt_rate,
-        "rake_floor_rate": rk_rate,
-        "gap_pp": gap_pp,
-        "fisher_p": fisher_p,
-        "phase4_reference": {
-            "gentag_floor": "12.5% (2/16)",
-            "rake_floor": "37.5% (6/16)",
-            "gap_pp": -25.0,
-        },
-        "replicates": gap_pp < -5,
-        "verdict": verdict,
-    }
-
-
-# ---------------------------------------------------------------------------
-# F) Decision Entropy
+# E) Decision Entropy
 # ---------------------------------------------------------------------------
 def compute_decision_entropy(summary: list) -> dict:
-    """Decision entropy per system — measures distribution skew.
-
-    If RAKE produces extreme skew (e.g., 60% REJECT) while gentags produce
-    a balanced distribution similar to FER, that reinforces "semantic legibility."
-    Closer to FER entropy = better representation fidelity.
-    """
     results = {}
+    systems = sorted(set(r["system"] for r in summary))
 
-    for system in ["gentag", "rake", "gentag_truncated", "fer"]:
+    for system in systems:
         sys_rows = [r for r in summary if r["system"] == system]
         decisions = [r["decision"] for r in sys_rows if r["decision"] != "UNSCORABLE"]
         counts = Counter(decisions)
@@ -508,94 +329,112 @@ def compute_decision_entropy(summary: list) -> dict:
         results[system] = {
             "entropy": decision_entropy(decisions),
             "normalized_entropy": normalized_entropy(decisions),
-            "distribution": {
-                "REJECT": round(counts.get("REJECT", 0) / total, 4) if total else 0,
-                "BORDERLINE": round(counts.get("BORDERLINE", 0) / total, 4) if total else 0,
-                "RECOMMEND": round(counts.get("RECOMMEND", 0) / total, 4) if total else 0,
-            },
+            "distribution": {d: round(counts.get(d, 0) / total, 4) if total else 0
+                             for d in ["REJECT", "BORDERLINE", "RECOMMEND"]},
             "n": total,
         }
 
-        # Per-persona entropy
-        per_persona = {}
-        for pid in ["P1", "P2", "P3"]:
-            p_rows = [r for r in sys_rows if r["persona_id"] == pid]
-            p_decisions = [r["decision"] for r in p_rows if r["decision"] != "UNSCORABLE"]
-            per_persona[pid] = {
-                "entropy": decision_entropy(p_decisions),
-                "normalized_entropy": normalized_entropy(p_decisions),
-            }
-        results[system]["per_persona"] = per_persona
-
-    # Distance from FER distribution (L1 norm)
-    fer_dist = results["fer"]["distribution"]
-    for system in ["gentag", "rake", "gentag_truncated"]:
-        sys_dist = results[system]["distribution"]
-        l1 = sum(abs(sys_dist[d] - fer_dist[d]) for d in ["REJECT", "BORDERLINE", "RECOMMEND"])
-        results[system]["l1_distance_from_fer"] = round(l1, 4)
-        results[system]["entropy_gap_from_fer"] = round(
-            results[system]["entropy"] - results["fer"]["entropy"], 4)
+    # L1 distance from FER
+    if "fer" in results:
+        fer_dist = results["fer"]["distribution"]
+        for system in TAG_SYSTEMS:
+            if system in results:
+                sys_dist = results[system]["distribution"]
+                l1 = sum(abs(sys_dist[d] - fer_dist[d])
+                         for d in ["REJECT", "BORDERLINE", "RECOMMEND"])
+                results[system]["l1_distance_from_fer"] = round(l1, 4)
 
     return results
 
 
 # ---------------------------------------------------------------------------
-# Per-venue breakdown
+# F) Cross-Judge Comparison
 # ---------------------------------------------------------------------------
-def compute_per_venue_breakdown(summary: list, venues: dict) -> list:
-    """One row per venue with all system decisions by persona."""
-    venue_data = defaultdict(dict)
+def compute_cross_judge(summary1: list, summary2: list, label1: str, label2: str) -> dict:
+    # Build lookups: (venue_id, persona_id, system) -> decision
+    lookup1 = {(r["venue_id"], r["persona_id"], r["system"]): r["decision"]
+               for r in summary1}
+    lookup2 = {(r["venue_id"], r["persona_id"], r["system"]): r["decision"]
+               for r in summary2}
 
-    for r in summary:
-        vid = r["venue_id"]
-        key = f"{r['persona_id']}_{r['system']}"
-        venue_data[vid][key] = r["decision"]
-        venue_data[vid]["venue_name"] = r.get("venue_name", "")
+    results = {}
+    systems = sorted(set(r["system"] for r in summary1))
 
-    breakdown = []
-    for vid, data in venue_data.items():
-        v = venues.get(vid, {})
-        row = {
-            "venue_id": vid,
-            "venue_name": data.get("venue_name", ""),
-            "stratum": v.get("stratum", ""),
-            "has_game_tag": v.get("has_game_tag", False),
-            "has_speed_tag": v.get("has_speed_tag", False),
-            "gentag_count": v.get("gentag_count", 0),
-            "rake_count": v.get("rake_count", 0),
+    for system in systems:
+        matches = total = 0
+        labels_1 = []
+        labels_2 = []
+
+        for key, dec1 in lookup1.items():
+            if key[2] != system:
+                continue
+            dec2 = lookup2.get(key)
+            if not dec2 or dec1 == "UNSCORABLE" or dec2 == "UNSCORABLE":
+                continue
+            total += 1
+            labels_1.append(dec1)
+            labels_2.append(dec2)
+            if dec1 == dec2:
+                matches += 1
+
+        kappa = cohens_kappa(labels_1, labels_2) if total > 0 else None
+        results[system] = {
+            "matches": matches, "total": total,
+            "agreement_rate": wilson_ci(matches, total),
+            "kappa": kappa,
         }
-        for pid in ["P1", "P2", "P3"]:
-            for sys in ["gentag", "rake", "gentag_truncated", "fer"]:
-                row[f"{pid}_{sys}"] = data.get(f"{pid}_{sys}", None)
-        breakdown.append(row)
 
-    return sorted(breakdown, key=lambda x: x["venue_id"])
+    # Overall
+    all_1 = []
+    all_2 = []
+    for key, dec1 in lookup1.items():
+        dec2 = lookup2.get(key)
+        if dec2 and dec1 != "UNSCORABLE" and dec2 != "UNSCORABLE":
+            all_1.append(dec1)
+            all_2.append(dec2)
+    overall_matches = sum(1 for a, b in zip(all_1, all_2) if a == b)
+    results["overall"] = {
+        "matches": overall_matches, "total": len(all_1),
+        "agreement_rate": wilson_ci(overall_matches, len(all_1)),
+        "kappa": cohens_kappa(all_1, all_2) if all_1 else None,
+    }
+
+    return {
+        "judges": [label1, label2],
+        "per_system": results,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Phase 5 Baseline Legibility Analysis")
-    parser.add_argument("--summary", required=True,
-                        help="Path to baseline_summary_XXXXX.json")
-    parser.add_argument("--venues", default=str(VENUES_FILE),
-                        help="Path to sampled_venues.json")
-    parser.add_argument("--output", default=None,
-                        help="Output path (default: results/phase5/baseline_legibility_analysis.json)")
+    parser = argparse.ArgumentParser(description="Phase 5 Baseline Legibility Analysis (v2)")
+    parser.add_argument("--summary", required=True, help="Primary summary JSON")
+    parser.add_argument("--summary2", default=None,
+                        help="Second judge summary JSON (for cross-judge comparison)")
+    parser.add_argument("--venues", default=str(VENUES_FILE))
+    parser.add_argument("--personas", default=str(PERSONAS_FILE))
+    parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
     print("Loading data...")
     summary = load_summary(args.summary)
     venues = load_venues(args.venues)
-    print(f"  {len(summary)} summary rows, {len(venues)} venues")
+    personas = load_personas(args.personas)
+    print(f"  {len(summary)} rows, {len(venues)} venues, {len(personas)} personas")
 
-    # Compute all metrics
+    systems_in_data = sorted(set(r["system"] for r in summary))
+    personas_in_data = sorted(set(r["persona_id"] for r in summary))
+    print(f"  Systems: {systems_in_data}")
+    print(f"  Personas: {personas_in_data}")
+
+    # Compute metrics
     print("\nA) Decision distribution...")
     decision_dist = compute_decision_distribution(summary)
 
     print("B) Hard requirement compliance...")
-    compliance = compute_hard_requirement_compliance(summary, venues)
+    compliance = compute_hard_requirement_compliance(summary, venues, personas)
 
     print("C) FER agreement...")
     fer_agreement = compute_fer_agreement(summary)
@@ -603,177 +442,151 @@ def main():
     print("D) Token-budget ablation...")
     ablation = compute_ablation(summary)
 
-    print("E) Floor rate replication...")
-    floor_repl = compute_floor_replication(summary)
-
-    print("F) Decision entropy...")
+    print("E) Decision entropy...")
     entropy = compute_decision_entropy(summary)
 
-    print("Per-venue breakdown...")
-    per_venue = compute_per_venue_breakdown(summary, venues)
+    cross_judge = None
+    if args.summary2:
+        print("F) Cross-judge comparison...")
+        summary2 = load_summary(args.summary2)
+        cross_judge = compute_cross_judge(summary, summary2, "judge1", "judge2")
 
-    # Build output (strip details for top-level, keep in separate section)
-    compliance_summary = {}
-    for sys in ["gentag", "rake", "gentag_truncated", "fer"]:
-        compliance_summary[sys] = {
-            "P2": {k: v for k, v in compliance[sys]["P2"].items() if k != "details"},
-            "P3": {k: v for k, v in compliance[sys]["P3"].items() if k != "details"},
-            "combined": compliance[sys]["combined"],
-        }
-    compliance_summary["fisher_gentag_vs_rake"] = compliance["fisher_gentag_vs_rake"]
-
-    fer_summary = {}
-    for sys in ["gentag", "rake", "gentag_truncated"]:
-        fer_summary[sys] = {k: v for k, v in fer_agreement[sys].items() if k != "details"}
-    fer_summary["fisher_gentag_vs_rake"] = fer_agreement["fisher_gentag_vs_rake"]
-
+    # Build output
     output = {
-        "experiment": "Phase 5 — Baseline Legibility Analysis",
+        "experiment": "Phase 5 — Baseline Legibility Analysis (v2)",
         "summary_file": str(args.summary),
         "n_venues": len(venues),
         "n_summary_rows": len(summary),
+        "systems": systems_in_data,
+        "personas": personas_in_data,
         "A_decision_distribution": decision_dist,
-        "B_hard_requirement_compliance": compliance_summary,
-        "C_fer_agreement": fer_summary,
+        "B_hard_requirement_compliance": compliance,
+        "C_fer_agreement": fer_agreement,
         "D_token_budget_ablation": ablation,
-        "E_floor_rate_replication": floor_repl,
-        "F_decision_entropy": entropy,
-        "per_venue_breakdown": per_venue,
+        "E_decision_entropy": entropy,
     }
+    if cross_judge:
+        output["F_cross_judge"] = cross_judge
 
     out_path = Path(args.output) if args.output else (OUTPUT_DIR / "baseline_legibility_analysis.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    # ---------------------------------------------------------------------------
+    # -----------------------------------------------------------------------
     # Print report
-    # ---------------------------------------------------------------------------
-    print(f"\n{'='*70}")
-    print("PHASE 5 — BASELINE LEGIBILITY ANALYSIS")
-    print(f"{'='*70}")
+    # -----------------------------------------------------------------------
+    print(f"\n{'='*75}")
+    print("PHASE 5 — BASELINE LEGIBILITY ANALYSIS (v2)")
+    print(f"{'='*75}")
 
     # A) Decision Distribution
-    print(f"\n--- A) DECISION DISTRIBUTION (Floor Rate = Baseline REJECT Rate) ---")
-    print(f"  {'System':>20s} | {'REJECT':>8s} {'BORDER':>8s} {'RECOM':>8s} | {'Floor Rate':>12s} {'95% CI':>18s}")
-    print(f"  {'-'*20}-+-{'-'*8}-{'-'*8}-{'-'*8}-+-{'-'*12}-{'-'*18}")
-    for sys in ["gentag", "rake", "gentag_truncated", "fer"]:
+    print(f"\n--- A) DECISION DISTRIBUTION ---")
+    print(f"  {'System':>18s} | {'REJ':>5s} {'BOR':>5s} {'REC':>5s} | {'Floor':>7s} {'95% CI':>18s}")
+    print(f"  {'-'*18}-+-{'-'*5}-{'-'*5}-{'-'*5}-+-{'-'*7}-{'-'*18}")
+    for sys in systems_in_data:
         d = decision_dist[sys]
         fr = d["floor_rate"]
-        print(f"  {sys:>20s} | {d['REJECT']:>8d} {d['BORDERLINE']:>8d} {d['RECOMMEND']:>8d} | "
-              f"{fr['point']:>11.1%} [{fr['lower']:.1%}, {fr['upper']:.1%}]")
+        print(f"  {sys:>18s} | {d['REJECT']:>5d} {d['BORDERLINE']:>5d} {d['RECOMMEND']:>5d} | "
+              f"{fr['point']:>6.1%} [{fr['lower']:.1%}, {fr['upper']:.1%}]")
 
-    # B) Hard Requirement Compliance
+    # B) Compliance
     print(f"\n--- B) HARD REQUIREMENT COMPLIANCE ---")
-    for pid in ["P2", "P3"]:
-        print(f"\n  {pid}:")
-        print(f"  {'System':>20s} | {'Correct':>8s} {'Total':>6s} | {'Compliance':>12s} {'95% CI':>18s}")
-        print(f"  {'-'*20}-+-{'-'*8}-{'-'*6}-+-{'-'*12}-{'-'*18}")
-        for sys in ["gentag", "rake", "gentag_truncated", "fer"]:
-            c = compliance_summary[sys][pid]
+    for pid in HARD_PERSONAS:
+        if pid not in personas_in_data:
+            continue
+        print(f"\n  {pid} ({personas.get(pid, {}).get('name', '')}):")
+        print(f"  {'System':>18s} | {'OK':>4s} {'N':>4s} | {'Compliance':>11s}")
+        print(f"  {'-'*18}-+-{'-'*4}-{'-'*4}-+-{'-'*11}")
+        for sys in systems_in_data:
+            c = compliance.get(sys, {}).get(pid, {})
+            if not c:
+                continue
             cr = c["compliance"]
-            print(f"  {sys:>20s} | {c['correct']:>8d} {c['total']:>6d} | "
-                  f"{cr['point']:>11.1%} [{cr['lower']:.1%}, {cr['upper']:.1%}]")
-    print(f"\n  Fisher's exact (gentag vs rake combined): p={compliance_summary['fisher_gentag_vs_rake']}")
+            print(f"  {sys:>18s} | {c['correct']:>4d} {c['total']:>4d} | {cr['point']:>10.1%}")
+
+    # Fisher's
+    for baseline in ["rake", "yake", "tfidf"]:
+        key = f"fisher_gentag_vs_{baseline}"
+        if key in compliance:
+            print(f"  Fisher gentag vs {baseline}: p={compliance[key]}")
 
     # C) FER Agreement
     print(f"\n--- C) FER AGREEMENT ---")
-    print(f"  {'System':>20s} | {'Match':>6s} {'Total':>6s} | {'Agreement':>10s} {'Kappa':>8s} | {'Upgrades':>9s} {'Downgrades':>11s}")
-    print(f"  {'-'*20}-+-{'-'*6}-{'-'*6}-+-{'-'*10}-{'-'*8}-+-{'-'*9}-{'-'*11}")
-    for sys in ["gentag", "rake", "gentag_truncated"]:
-        f = fer_summary[sys]
+    print(f"  {'System':>18s} | {'Match':>5s} {'N':>5s} | {'Agree':>7s} {'Kappa':>7s} | {'Up':>4s} {'Down':>4s}")
+    print(f"  {'-'*18}-+-{'-'*5}-{'-'*5}-+-{'-'*7}-{'-'*7}-+-{'-'*4}-{'-'*4}")
+    for sys in TAG_SYSTEMS:
+        if sys not in fer_agreement:
+            continue
+        f = fer_agreement[sys]
         ar = f["agreement_rate"]
-        print(f"  {sys:>20s} | {f['matches']:>6d} {f['total']:>6d} | "
-              f"{ar['point']:>9.1%} {f['kappa']:>8.3f} | "
-              f"{f['upgrades']:>9d} {f['downgrades']:>11d}")
-    print(f"  Fisher's exact (gentag vs rake agreement): p={fer_summary['fisher_gentag_vs_rake']}")
+        k = f["kappa"] if f["kappa"] is not None else 0
+        print(f"  {sys:>18s} | {f['matches']:>5d} {f['total']:>5d} | "
+              f"{ar['point']:>6.1%} {k:>7.3f} | {f['upgrades']:>4d} {f['downgrades']:>4d}")
 
-    # D) Token-Budget Ablation
-    print(f"\n--- D) TOKEN-BUDGET ABLATION ---")
-    ab = ablation
-    print(f"  Truncated gentag floor: {ab['truncated_floor_rate']['point']:.1%}")
-    print(f"  RAKE floor:             {ab['rake_floor_rate']['point']:.1%}")
-    print(f"  Gap:                    {ab['gap_pp']:+.1f}pp (Fisher p={ab['fisher_p']})")
-    print(f"  Interpretation:         {ab['interpretation']}")
+    for baseline in ["rake", "yake", "tfidf"]:
+        key = f"fisher_gentag_vs_{baseline}"
+        if key in fer_agreement:
+            print(f"  Fisher gentag vs {baseline}: p={fer_agreement[key]}")
 
-    # E) Floor Rate Replication
-    print(f"\n--- E) FLOOR RATE REPLICATION ---")
-    fl = floor_repl
-    print(f"  Phase 4: gentag {fl['phase4_reference']['gentag_floor']} "
-          f"vs RAKE {fl['phase4_reference']['rake_floor']} "
-          f"(gap={fl['phase4_reference']['gap_pp']:+.1f}pp)")
-    print(f"  Phase 5: gentag {fl['gentag_floor_rate']['point']:.1%} "
-          f"({fl['gentag_floor_rate']['k']}/{fl['gentag_floor_rate']['n']}) "
-          f"vs RAKE {fl['rake_floor_rate']['point']:.1%} "
-          f"({fl['rake_floor_rate']['k']}/{fl['rake_floor_rate']['n']}) "
-          f"(gap={fl['gap_pp']:+.1f}pp)")
-    print(f"  Fisher p={fl['fisher_p']}")
-    print(f"  Verdict: {fl['verdict']}")
-    print(f"  Replicates: {'YES' if fl['replicates'] else 'NO'}")
+    # D) Ablation
+    print(f"\n--- D) TOKEN-BUDGET ABLATION (truncated gentag vs baselines) ---")
+    for baseline in ["rake", "yake", "tfidf"]:
+        if baseline not in ablation:
+            continue
+        ab = ablation[baseline]
+        print(f"  vs {baseline:>6s}: trunc={ab['truncated_floor']['point']:.1%} "
+              f"base={ab['baseline_floor']['point']:.1%} "
+              f"gap={ab['gap_pp']:+.1f}pp (p={ab['fisher_p']})")
 
-    # F) Decision Entropy
-    print(f"\n--- F) DECISION ENTROPY ---")
-    print(f"  {'System':>20s} | {'H(bits)':>8s} {'H_norm':>7s} | {'P(REJ)':>7s} {'P(BOR)':>7s} {'P(REC)':>7s} | {'L1 vs FER':>10s}")
-    print(f"  {'-'*20}-+-{'-'*8}-{'-'*7}-+-{'-'*7}-{'-'*7}-{'-'*7}-+-{'-'*10}")
-    for sys in ["gentag", "rake", "gentag_truncated", "fer"]:
+    # E) Entropy
+    print(f"\n--- E) DECISION ENTROPY ---")
+    print(f"  {'System':>18s} | {'H':>6s} {'H_n':>5s} | {'P(R)':>6s} {'P(B)':>6s} {'P(C)':>6s} | {'L1/FER':>7s}")
+    print(f"  {'-'*18}-+-{'-'*6}-{'-'*5}-+-{'-'*6}-{'-'*6}-{'-'*6}-+-{'-'*7}")
+    for sys in systems_in_data:
         e = entropy[sys]
         d = e["distribution"]
         l1 = e.get("l1_distance_from_fer", "—")
-        l1_str = f"{l1:.3f}" if isinstance(l1, float) else l1
-        print(f"  {sys:>20s} | {e['entropy']:>8.3f} {e['normalized_entropy']:>7.3f} | "
-              f"{d['REJECT']:>7.1%} {d['BORDERLINE']:>7.1%} {d['RECOMMEND']:>7.1%} | "
-              f"{l1_str:>10s}")
-    print(f"\n  Interpretation: closer to FER entropy = better representation fidelity")
-    print(f"  If RAKE has extreme REJECT skew while gentag matches FER distribution,")
-    print(f"  this visually reinforces semantic legibility.")
+        l1s = f"{l1:.3f}" if isinstance(l1, float) else l1
+        print(f"  {sys:>18s} | {e['entropy']:>6.3f} {e['normalized_entropy']:>5.3f} | "
+              f"{d['REJECT']:>5.1%} {d['BORDERLINE']:>5.1%} {d['RECOMMEND']:>5.1%} | {l1s:>7s}")
 
-    # Verdict summary
-    print(f"\n{'='*70}")
-    print("VERDICT SUMMARY")
-    print(f"{'='*70}")
+    # F) Cross-judge
+    if cross_judge:
+        print(f"\n--- F) CROSS-JUDGE COMPARISON ---")
+        cj = cross_judge["per_system"]
+        print(f"  {'System':>18s} | {'Match':>5s} {'N':>5s} | {'Agree':>7s} {'Kappa':>7s}")
+        print(f"  {'-'*18}-+-{'-'*5}-{'-'*5}-+-{'-'*7}-{'-'*7}")
+        for sys in systems_in_data + ["overall"]:
+            if sys not in cj:
+                continue
+            c = cj[sys]
+            ar = c["agreement_rate"]
+            k = c["kappa"] if c["kappa"] is not None else 0
+            label = sys.upper() if sys == "overall" else sys
+            print(f"  {label:>18s} | {c['matches']:>5d} {c['total']:>5d} | "
+                  f"{ar['point']:>6.1%} {k:>7.3f}")
 
-    # Floor rate
-    fr_gap = fl["gap_pp"]
-    if fr_gap <= -15:
-        print(f"  Floor rate gap:        PAPER-READY ({fr_gap:+.1f}pp)")
-    elif fr_gap <= -5:
-        print(f"  Floor rate gap:        PROMISING ({fr_gap:+.1f}pp)")
-    else:
-        print(f"  Floor rate gap:        FAIL ({fr_gap:+.1f}pp)")
-
-    # Compliance
-    gt_comp = compliance_summary["gentag"]["combined"]["compliance"]["point"]
-    rk_comp = compliance_summary["rake"]["combined"]["compliance"]["point"]
-    print(f"  Compliance (gentag):   {gt_comp:.0%}")
-    print(f"  Compliance (RAKE):     {rk_comp:.0%}")
-    if gt_comp >= 0.85 and rk_comp < 0.70:
-        print(f"  Compliance verdict:    PAPER-READY")
-    elif gt_comp >= 0.75:
-        print(f"  Compliance verdict:    PROMISING")
-    else:
-        print(f"  Compliance verdict:    FAIL")
+    # Verdict
+    print(f"\n{'='*75}")
+    print("VERDICT")
+    print(f"{'='*75}")
 
     # FER agreement
-    gt_agree = fer_summary["gentag"]["agreement_rate"]["point"]
-    rk_agree = fer_summary["rake"]["agreement_rate"]["point"]
-    agree_gap = round((gt_agree - rk_agree) * 100, 1)
-    print(f"  FER agreement (gentag): {gt_agree:.0%}")
-    print(f"  FER agreement (RAKE):   {rk_agree:.0%}")
-    if agree_gap >= 10:
-        print(f"  FER agreement verdict:  PAPER-READY ({agree_gap:+.1f}pp)")
-    elif agree_gap >= 5:
-        print(f"  FER agreement verdict:  PROMISING ({agree_gap:+.1f}pp)")
-    else:
-        print(f"  FER agreement verdict:  FAIL ({agree_gap:+.1f}pp)")
+    gt_agree = fer_agreement.get("gentag", {}).get("agreement_rate", {}).get("point", 0)
+    for baseline in ["rake", "yake", "tfidf"]:
+        bl_agree = fer_agreement.get(baseline, {}).get("agreement_rate", {}).get("point", 0)
+        gap = round((gt_agree - bl_agree) * 100, 1)
+        status = "PAPER-READY" if gap >= 10 else "PROMISING" if gap >= 5 else "FAIL"
+        print(f"  FER agree gentag vs {baseline:>6s}: {gt_agree:.0%} vs {bl_agree:.0%} "
+              f"({gap:+.1f}pp) → {status}")
 
-    # Ablation
-    ab_gap = ablation["gap_pp"]
-    if ab_gap < -5:
-        print(f"  Ablation verdict:      PASS (truncated still > RAKE, gap={ab_gap:+.1f}pp)")
-    elif abs(ab_gap) <= 5:
-        print(f"  Ablation verdict:      MIXED (gap={ab_gap:+.1f}pp)")
-    else:
-        print(f"  Ablation verdict:      FAIL (gap={ab_gap:+.1f}pp)")
+    # Compliance
+    gt_comp = compliance.get("gentag", {}).get("combined", {}).get("compliance", {}).get("point", 0)
+    for baseline in ["rake", "yake", "tfidf"]:
+        bl_comp = compliance.get(baseline, {}).get("combined", {}).get("compliance", {}).get("point", 0)
+        gap = round((gt_comp - bl_comp) * 100, 1)
+        print(f"  Compliance gentag vs {baseline:>6s}: {gt_comp:.0%} vs {bl_comp:.0%} ({gap:+.1f}pp)")
 
     print(f"\nOutput: {out_path}")
 

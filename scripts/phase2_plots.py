@@ -18,19 +18,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Add src to path
+# Add scripts to path for shared style
+sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from plot_style import apply_style, MODEL_COLORS
 
 # Configuration
 OUTPUT_DIR = Path("results/phase2")
 TABLES_DIR = OUTPUT_DIR / "tables"
 PLOTS_DIR = OUTPUT_DIR / "plots"
 
-# Plot style
-sns.set_style("whitegrid")
-plt.rcParams["figure.dpi"] = 300
-plt.rcParams["savefig.dpi"] = 300
-plt.rcParams["font.size"] = 10
+# Apply shared style
+apply_style()
 
 
 def load_tables():
@@ -52,10 +51,10 @@ def load_tables():
 def plot_1_run_stability(run_stability: pd.DataFrame):
     """Plot 1: Run stability distribution (ECDF per model)."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    
+
     models = sorted(run_stability["model_key"].unique())
-    colors = sns.color_palette("husl", len(models))
-    
+    colors = [MODEL_COLORS.get(m, "#95a5a6") for m in models]
+
     # Left: ECDF
     ax = axes[0]
     for model, color in zip(models, colors):
@@ -63,17 +62,18 @@ def plot_1_run_stability(run_stability: pd.DataFrame):
         sorted_data = np.sort(data)
         y = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
         ax.plot(sorted_data, y, label=model, color=color, linewidth=2)
-    
+
     ax.set_xlabel("Cosine Similarity (Run 1 vs Run 2)")
     ax.set_ylabel("Cumulative Probability")
     ax.set_title("Run Stability (ECDF)")
     ax.legend(title="Model")
-    ax.grid(True, alpha=0.3)
     ax.set_xlim(0, 1)
-    
+
     # Right: Box plot
     ax = axes[1]
-    sns.boxplot(data=run_stability, x="model_key", y="cosine_similarity", ax=ax, palette=colors)
+    color_palette = {m: MODEL_COLORS.get(m, "#95a5a6") for m in models}
+    sns.boxplot(data=run_stability, x="model_key", y="cosine_similarity", ax=ax,
+                hue="model_key", palette=color_palette, legend=False)
     ax.set_xlabel("Model")
     ax.set_ylabel("Cosine Similarity")
     ax.set_title("Run Stability (Distribution)")
@@ -188,22 +188,23 @@ def plot_3_model_sensitivity(model_sensitivity: pd.DataFrame):
 def plot_4_retention(retention: pd.DataFrame):
     """Plot 4: Retention plot (cosine by model/prompt)."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    
+
     # Left: Box plot by model
     ax = axes[0]
     models = sorted(retention["model_key"].unique())
-    colors = sns.color_palette("husl", len(models))
-    sns.boxplot(data=retention, x="model_key", y="retention_cosine", ax=ax, palette=colors)
+    color_palette = {m: MODEL_COLORS.get(m, "#95a5a6") for m in models}
+    sns.boxplot(data=retention, x="model_key", y="retention_cosine", ax=ax,
+                hue="model_key", palette=color_palette, legend=False)
     ax.set_xlabel("Model")
     ax.set_ylabel("Retention Cosine Similarity")
     ax.set_title("Retention by Model")
     ax.tick_params(axis="x", rotation=45)
-    
+
     # Right: Box plot by prompt
     ax = axes[1]
-    prompts = sorted(retention["prompt_type"].unique())
-    colors = sns.color_palette("husl", len(prompts))
-    sns.boxplot(data=retention, x="prompt_type", y="retention_cosine", ax=ax, palette=colors)
+    prompt_colors = {"anti_hallucination": "#3498db", "minimal": "#2ecc71", "short_phrase": "#e74c3c"}
+    sns.boxplot(data=retention, x="prompt_type", y="retention_cosine", ax=ax,
+                hue="prompt_type", palette=prompt_colors, legend=False)
     ax.set_xlabel("Prompt Type")
     ax.set_ylabel("Retention Cosine Similarity")
     ax.set_title("Retention by Prompt")
@@ -257,19 +258,18 @@ def plot_5_cost_effectiveness(retention: pd.DataFrame):
 def plot_6_surface_vs_semantic(run_stability: pd.DataFrame):
     """Plot 6: Surface vs semantic scatter (Jaccard vs cosine)."""
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    
+
     # Scatter plot
     models = sorted(run_stability["model_key"].unique())
-    colors = sns.color_palette("husl", len(models))
-    
-    for model, color in zip(models, colors):
+
+    for model in models:
         data = run_stability[run_stability["model_key"] == model]
         ax.scatter(
             data["jaccard_norm_eval"],
             data["cosine_similarity"],
             label=model,
             alpha=0.5,
-            color=color,
+            color=MODEL_COLORS.get(model, "#95a5a6"),
             s=30
         )
     
@@ -311,11 +311,11 @@ def plot_7_sparsity(sparsity_df: pd.DataFrame):
     z = np.polyfit(sparsity_df['total_tokens'], sparsity_df['mean_pairwise_distance'], 1)
     p = np.poly1d(z)
     x_line = np.linspace(sparsity_df['total_tokens'].min(), sparsity_df['total_tokens'].max(), 100)
-    ax1.plot(x_line, p(x_line), "r--", alpha=0.8, label=f"Trend (r={corr:.3f})")
+    ax1.plot(x_line, p(x_line), "r-", alpha=0.35, linewidth=1.2)
 
     ax1.set_xlabel("Total Tokens (Evidence Amount)")
-    ax1.set_ylabel("Mean Pairwise Distance (Variability)")
-    ax1.set_title(f"S4: Evidence vs Variability (r={corr:.3f})")
+    ax1.set_ylabel("Representation Variability")
+    ax1.set_title("Evidence Amount vs Representation Variability")
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
@@ -359,7 +359,7 @@ def plot_7_sparsity(sparsity_df: pd.DataFrame):
         )
 
     ax2.set_xlabel("Token Bucket (Evidence Amount)")
-    ax2.set_ylabel("Mean Pairwise Distance (Variability)")
+    ax2.set_ylabel("Representation Variability")
     ax2.set_title("Variability by Evidence Amount")
     ax2.grid(True, alpha=0.3)
 
