@@ -44,6 +44,7 @@ These are the local artifact directories that back the paper and current analysi
 - Phase 2 embedding cache: `results/phase2_cache/`
 - Phase 3 outputs: `results/phase3/`
 - Phase 3A baseline outputs: `results/phase3a/`
+- Phase 4 outputs: `results/phase4/`
 - Phase 5 outputs: `results/phase5/`
 
 Canonical Phase 5 files:
@@ -65,6 +66,7 @@ Frozen / paper-backed:
 - Phase 1 extracted outputs in `results/phase1_downloaded/`
 - Phase 2 tables and plots in `results/phase2/`
 - Phase 3 tables and plots in `results/phase3/` and `results/phase3a/`
+- Phase 4 supporting DIR outputs in `results/phase4/`
 - Phase 5 manifests, summaries, analysis JSON, audit CSV, and plots in `results/phase5/`
 
 Reasonable to rerun locally:
@@ -80,6 +82,14 @@ Expensive / not required for paper verification:
 - Repeating all judge calls for Phase 5
 
 ## 6. Phase Commands
+
+Phase overview:
+
+- Phase 1: extraction pipeline
+- Phase 2: stability analysis
+- Phase 3: structural analysis
+- Phase 4: DIR experiment (supporting mechanism evidence)
+- Phase 5: decision evaluation
 
 ### Phase 1
 
@@ -129,6 +139,43 @@ Notes:
 - Requires local Phase 1 artifacts in `results/phase1_downloaded/`
 - Requires Phase 2 embedding cache in `results/phase2_cache/`
 - Requires `OPENAI_API_KEY` for anchor embeddings
+
+### Phase 4
+
+Phase 4 is supporting mechanism evidence, not one of the main headline result sets. It explores whether gentag state supports directional intervention reasoning (DIR).
+
+Key outputs live in `results/phase4/`, especially:
+
+- `results/phase4/sample_venue.json`
+- `results/phase4/dir_summary_*.json`
+- `results/phase4/dir_manifest_*.json`
+- `results/phase4/scaled_aggregate.json`
+
+Extract or refresh sample venue data:
+
+```bash
+poetry run python scripts/phase4_sample_venue.py
+```
+
+Run the DIR experiment for one unit set:
+
+```bash
+poetry run python scripts/phase4_dir_runner.py --dry-run
+```
+
+Aggregate cross-venue DIR summaries:
+
+```bash
+poetry run python scripts/phase4_aggregate.py \
+  --gentag-summaries results/phase4/dir_summary_20260223_033107.json results/phase4/dir_summary_20260223_040411.json results/phase4/dir_summary_20260223_040613.json \
+  --rake-summaries results/phase4/dir_summary_20260223_033303.json results/phase4/dir_summary_20260223_040514.json results/phase4/dir_summary_20260223_040714.json
+```
+
+Interpretation:
+
+- treat Phase 4 as supporting mechanistic evidence
+- do not treat it as the primary benchmark result set
+- use `docs/phase4/DIR_SCALED_RUN_REPORT.md` for the narrative around the executed runs
 
 ### Phase 5
 

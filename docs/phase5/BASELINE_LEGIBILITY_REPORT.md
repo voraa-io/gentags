@@ -268,7 +268,7 @@ Claude Sonnet had a higher invalid rate (10.4% vs OpenAI's 3.4%) and 101 unscora
 |------|--------|
 | `data/phase5/sampled_venues.json` | Complete (50 venues, 6 systems) |
 | `data/phase5/phase5_personas.json` | Frozen (4 personas with indicator lexicons) |
-| `data/phase5/baseline_config.json` | Frozen |
+| `data/phase5/baseline_config.json` | Stale historical config (retained, not canonical) |
 | `results/phase5/baseline_results_openai_20260228_022320.json` | Complete (1200 conditions) |
 | `results/phase5/baseline_summary_openai_20260228_022320.json` | Complete |
 | `results/phase5/baseline_manifest_openai_20260228_022320.json` | Complete |

@@ -67,17 +67,19 @@ Figures exist in **three** places with no clear canonical source:
 
 | Location | Contents |
 |----------|----------|
-| `docs/plots/` | 14 PNG files (named `fig1_pipeline_overview.png`, `figA1_...`, etc.) |
+| `docs/_archive/plots/` | 14 archived PNG copies (named `fig1_pipeline_overview.png`, `figA1_...`, etc.) |
 | `results/figures/` | 1 file (`fig1_pipeline.png`) |
 | `results/phase*/plots/` | Raw phase outputs (named `1_run_stability.png`, etc.) |
 
-`PAPER_complete.md` references `results/figures/` (Fig 1 only) and `results/phase*/plots/` (all other figures). The `docs/plots/` copies are unused by the paper and have different filenames.
+`PAPER_complete.md` references `results/figures/` (Fig 1 only) and `results/phase*/plots/` (all other figures). The duplicated doc-local copies were archived during cleanup because they were unused by the paper and had different filenames.
 
-**Risk:** `docs/plots/` may be stale copies. No script generates them or keeps them in sync.
+**Current state:** non-canonical duplicate plot copies live in `docs/_archive/plots/`.
 
 ### 3.3 Stale data config still present
 
-`data/phase5/baseline_config.json` describes an older 3-persona / 4-system design. The actual experiment used 4 personas / 6 systems. `PAPER_SOURCE_OF_TRUTH.md` already flags it as STALE but the file is still there with no warning in-file.
+`data/phase5/baseline_config.json` describes an older 3-persona / 4-system design. The actual experiment used 4 personas / 6 systems. `PAPER_SOURCE_OF_TRUTH.md` already flags it as STALE.
+
+**Current state:** the file now includes an explicit in-file stale note and is retained only for historical reference.
 
 ### 3.4 RESOLVED: repo-facing docs now match the current test/validation path
 
@@ -368,8 +370,6 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 
 | Priority | Issue | Effort |
 |----------|-------|--------|
-| **MEDIUM** | `docs/plots/` has 14 unused figure copies (different names from paper refs) | 5 min |
-| **MEDIUM** | `data/phase5/baseline_config.json` is stale with no in-file warning | 2 min |
 | **MEDIUM** | Config metadata is duplicated across `src/gentags/config.py` and `src/gentags/pipeline.py` | 15 min |
 | **MEDIUM** | Visible docs are now lean at the top level, but some secondary phase docs could still move into archive | 10 min |
 | **LOW** | `CLAUDE.md` is empty | 5 min |
@@ -395,7 +395,7 @@ This is the current repo-cleanup execution order. Treat it as the working checkl
 - [x] `pytest` failure mode verified directly
 - [x] Phase 5 canonical manifests and analysis artifacts verified
 - [x] Paper figure paths verified
-- [x] `docs/plots/` duplication verified
+- [x] `docs/plots/` duplication verified and archived to `docs/_archive/plots/`
 - [x] Phase 1 extraction provenance traced to GCP VM docs + download script
 - [x] Confirmed active downstream dependence on `results/phase1_downloaded/`
 
@@ -408,7 +408,6 @@ This is the current repo-cleanup execution order. Treat it as the working checkl
    - which local artifacts are canonical
    - which files back the paper
 4. Clean obvious clutter:
-   - duplicate `docs/plots/` copies
    - stale Phase 5 config warning / archival
    - empty `CLAUDE.md`
    - empty `app/` placeholders if unused
