@@ -49,7 +49,7 @@ This repository supports **Study 1** of the Gentags project.
 - Ratings are explicitly excluded from extraction
 - Output validity refers to **format correctness only**, not semantic truth
 
-All definitions, prompts, and model identifiers are frozen and documented in: `docs/STUDY1_LOCK.md`
+All definitions, prompts, model identifiers, and reproduction guidance are documented in `docs/EXTRACTION.md` and `docs/REPRODUCE_PAPER.md`.
 
 ---
 
@@ -155,7 +155,7 @@ Use `summarize_cost()` to generate:
 - Extraction-level CSV (one row per extraction)
 - Cost breakdown by model/prompt
 
-See `docs/STUDY1_LOCK.md` for the frozen Study 1 methodology.
+See `docs/REPRODUCE_PAPER.md` for the canonical paper reproduction path.
 
 ---
 
@@ -225,8 +225,8 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 | **Localization advantage** | **1.50×** |
 | Paraphrase MMC | 0.648 |
 
-See `docs/SECTION3_REPRESENTATION.md` for the core representation claims.
-See `docs/MOTIVATION.md` for why gentags are necessary.
+See `docs/PAPER_complete.md` for the core paper claims.
+See `docs/EXTRACTION.md` for extraction details and methodology.
 
 ---
 
@@ -234,12 +234,13 @@ See `docs/MOTIVATION.md` for why gentags are necessary.
 
 | Document | Description |
 |----------|-------------|
-| `docs/MOTIVATION.md` | Why gentags exist (31.6% LLM instability) |
-| `docs/PHASE1_EXTRACTION.md` | Multi-model extraction (13,272 extractions) |
-| `docs/PHASE2_STABILITY.md` | Semantic stability analysis |
-| `docs/SECTION3_REPRESENTATION.md` | **Core claims: localization, baselines, boundaries** |
-| `docs/STUDY1_LOCK.md` | Frozen methodology |
+| `docs/PAPER_complete.md` | Full paper draft |
+| `docs/PAPER_SOURCE_OF_TRUTH.md` | Claim-to-artifact map |
+| `docs/PAPER_STATUS.md` | Submission status and open items |
 | `docs/REPRODUCE_PAPER.md` | Canonical commands, artifact paths, and rerun guidance |
+| `docs/PHASE2_STABILITY.md` | Semantic stability analysis |
+| `docs/EXTRACTION.md` | Extraction method and file references |
+| `docs/PHASE3_METHODOLOGY_FIX.md` | Final methodological adjustment for Phase 3 |
 
 ---
 

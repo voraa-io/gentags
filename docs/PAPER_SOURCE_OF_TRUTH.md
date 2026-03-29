@@ -42,7 +42,7 @@ These files should **not** be used as primary sources for current paper claims w
 | `results/phase5/baseline_manifest_20260223_051347.json` | Older pre-v2 run | Superseded |
 | `results/phase5/baseline_summary_20260223_051347.json` | Older pre-v2 run | Superseded |
 | `results/phase5/baseline_summary_48venues.json` | Partial/older slice | Superseded |
-| `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` | Useful context, but Phase 3 framing is outdated | Secondary |
+| `docs/_archive/superseded/GENTAGS_FULL_ANALYSIS_REPORT.md` | Useful context, but Phase 3 framing is outdated | Secondary |
 | `docs/_archive/**` | Historical planning and older narratives | Historical only |
 
 For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
@@ -55,8 +55,8 @@ For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
 
 **Current status:** written in `docs/PAPER_complete.md`  
 **Use as inputs:**
-- `docs/paper_problem_question_report.md`
-- `docs/MOTIVATION.md` as background only
+- `docs/_archive/superseded/paper_problem_question_report.md`
+- `docs/_archive/superseded/MOTIVATION.md` as background only
 - verified results sections below for finalized claims
 
 **Do not use as sole authority:** old framing docs in `docs/_archive/`
@@ -66,7 +66,7 @@ For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
 **Current status:** written in `docs/PAPER_complete.md`  
 **Use as inputs:**
 - literature notes to be gathered separately
-- `docs/paper_problem_question_report.md` for framing boundaries only
+- `docs/_archive/superseded/paper_problem_question_report.md` for framing boundaries only
 
 ### Section 3. Method - Extraction
 
@@ -99,7 +99,7 @@ For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
 ### Section 5. Method - Structure (State-Gini)
 
 **Primary design doc:**
-- `docs/PHASE3_STATE_GINI_PLAN.md`
+- `docs/_archive/superseded/PHASE3_STATE_GINI_PLAN.md`
 
 **Authority for executed results:**
 - `results/phase3/*`
@@ -142,20 +142,20 @@ Use:
 - Section 6: Phase 5 artifacts
 
 Avoid:
-- relying on `docs/GENTAGS_FULL_ANALYSIS_REPORT.md` for final consolidated numbers
+- relying on `docs/_archive/superseded/GENTAGS_FULL_ANALYSIS_REPORT.md` for final consolidated numbers
 
 ### Section 8. Discussion
 
 **Use as inputs:**
 - verified results from Sections 3-6
-- `docs/paper_problem_question_report.md`
+- `docs/_archive/superseded/paper_problem_question_report.md`
 - `docs/phase4/DIR_SCALED_RUN_REPORT.md` only as supporting mechanism evidence
 
 ### Section 9. Limitations
 
 **Use as inputs:**
 - `docs/PAPER_STATUS.md`
-- `docs/paper_problem_question_report.md`
+- `docs/_archive/superseded/paper_problem_question_report.md`
 - Phase-specific caveats from manifests and reports
 
 ### Section 10. Conclusion

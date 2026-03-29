@@ -29,7 +29,7 @@ researchGentags/
 ├── tests/                Unit tests (4 files)
 ├── data/                 Frozen inputs (venues, personas, configs)
 ├── results/              Run artifacts (manifests, summaries, plots)
-├── docs/                 Paper draft + 35 active markdown docs + 24 archived markdown docs
+├── docs/                 Paper-facing docs + 19 active markdown docs + 41 archived markdown docs
 ├── notebooks/            4 Jupyter notebooks (exploratory)
 ├── app/                  Empty (backend/ + frontend/ placeholders)
 ├── examples/             1 file (Phase 3 facet matching example)
@@ -47,7 +47,7 @@ researchGentags/
 
 ## 3. Critical Issues
 
-### 3.1 TESTS ARE BROKEN (3/4 test files fail to import)
+### 3.1 RESOLVED: tests now pass
 
 ```
 tests/test_parsing.py    → imports from gentags.parsing   (DOES NOT EXIST)
@@ -55,11 +55,11 @@ tests/test_filter.py     → imports from gentags.normalize (DOES NOT EXIST)
 tests/test_normalize.py  → imports from gentags.normalize (DOES NOT EXIST)
 ```
 
-All three functions (`extract_json_list`, `filter_valid_tags`, `normalize_tag`) live in `gentags.pipeline`, not in separate modules. Only `test_hashes.py` passes.
+All three functions (`extract_json_list`, `filter_valid_tags`, `normalize_tag`) live in `gentags.pipeline`, not in separate modules. The tests were fixed by updating the test imports rather than changing pipeline code.
 
-**Result:** `pytest` reports 3 collection errors. 3/4 test files are non-functional.
+**Current state:** `poetry run pytest tests/` passes (`28 passed`).
 
-**Fix:** Either update imports to `from gentags.pipeline import ...` or split `pipeline.py` into separate modules.
+**Cleanup rule preserved:** test harness fixes are allowed; pipeline behavior changes just to satisfy tests are not.
 
 ### 3.2 Duplicate figure locations
 
@@ -79,17 +79,17 @@ Figures exist in **three** places with no clear canonical source:
 
 `data/phase5/baseline_config.json` describes an older 3-persona / 4-system design. The actual experiment used 4 personas / 6 systems. `PAPER_SOURCE_OF_TRUTH.md` already flags it as STALE but the file is still there with no warning in-file.
 
-### 3.4 Repo docs are partially stale
+### 3.4 RESOLVED: repo-facing docs now match the current test/validation path
 
-Two repo-facing documents overstate the current hygiene state:
+This was previously a problem in:
 
 - `README.md` says `poetry run pytest tests/` passes and references `scripts/smoke_test_minimal.py`
 - `AGENTS.md` repeats the same guidance
 
-In the current tree:
+It has now been corrected:
 
-- `pytest` fails during collection because three test files import nonexistent modules
-- `scripts/smoke_test_minimal.py` is archived under `scripts/_archive/`, not present as an active script
+- `pytest` passes
+- both docs now point to a verified `scripts/run_phase1.py --dry-run` validation path instead of the archived smoke test
 
 ### 3.5 Phase 1 extraction path is under-documented
 
@@ -102,7 +102,7 @@ The repo structure strongly suggests the large Phase 1 extraction was run on a G
 
 The current local canonical copy of those outputs is `results/phase1_downloaded/`, and downstream scripts depend on that path.
 
-However, `docs/PHASE1_EXTRACTION.md` still says results live in `results/phase1/`, which does not match the current working repo layout.
+This was corrected in the current visible docs during cleanup; `results/phase1_downloaded/` is now the current documented local path.
 
 ---
 
@@ -110,7 +110,7 @@ However, `docs/PHASE1_EXTRACTION.md` still says results live in `results/phase1/
 
 ### 4.1 Documentation redundancy (HIGH)
 
-The `docs/` directory has **59 markdown files** (35 active + 24 archived). Many cover the same content at different stages of development. Now that `PAPER_complete.md` is the finished draft, most are superseded.
+The `docs/` directory has **60 markdown files** (19 active + 41 archived). Many cover the same content at different stages of development. During cleanup, the most obvious paper-section drafts, superseded summaries, and secondary top-level docs were moved into `docs/_archive/superseded/`.
 
 #### Files fully superseded by PAPER_complete.md
 
@@ -118,15 +118,15 @@ These docs' content is now entirely contained in the final paper draft:
 
 | File | What it covered | Status |
 |------|----------------|--------|
-| `SECTION3_GENTAGS.md` | Paper Section 3 draft | Folded into paper |
-| `SECTION3_REPRESENTATION.md` | Alternative Section 3 framing | Folded into paper |
-| `SECTION4_EXPERIMENTAL_SETUP.md` | Paper Section 4 draft | Folded into paper |
-| `SECTION5_ANALYSIS_RESULTS.md` | Paper Section 5 draft | Folded into paper |
-| `SECTION6_DISCUSSION.md` | Paper Section 6 draft | Folded into paper |
-| `RESULTS.md` | Results narrative | Folded into paper |
-| `APPENDIX_FAILURE_AUDIT.md` | Appendix B content | Folded into paper |
-| `PAPER_FIGURES.md` | Figure inventory | Figures are inline in paper |
-| `MOTIVATION.md` | Problem framing | Intro is written |
+| `docs/_archive/superseded/SECTION3_GENTAGS.md` | Paper Section 3 draft | Archived |
+| `docs/_archive/superseded/SECTION3_REPRESENTATION.md` | Alternative Section 3 framing | Archived |
+| `docs/_archive/superseded/SECTION4_EXPERIMENTAL_SETUP.md` | Paper Section 4 draft | Archived |
+| `docs/_archive/superseded/SECTION5_ANALYSIS_RESULTS.md` | Paper Section 5 draft | Archived |
+| `docs/_archive/superseded/SECTION6_DISCUSSION.md` | Paper Section 6 draft | Archived |
+| `docs/_archive/superseded/RESULTS.md` | Results narrative | Archived |
+| `docs/_archive/superseded/APPENDIX_FAILURE_AUDIT.md` | Appendix B content | Archived |
+| `docs/_archive/superseded/PAPER_FIGURES.md` | Figure inventory | Archived |
+| `docs/_archive/superseded/MOTIVATION.md` | Problem framing | Archived |
 
 #### Files that still serve a purpose
 
@@ -135,12 +135,10 @@ These docs' content is now entirely contained in the final paper draft:
 | `PAPER_complete.md` | **THE** paper |
 | `PAPER_SOURCE_OF_TRUTH.md` | Maps paper claims to source artifacts |
 | `PAPER_STATUS.md` | Tracks open items |
+| `REPRODUCE_PAPER.md` | Single operational entry point for installation, canonical artifacts, and reruns |
 | `EXTRACTION.md` | Authoritative method doc (prompts, taxonomy detail beyond paper) |
 | `PHASE2_STABILITY.md` | Detailed Phase 2 numbers backing paper claims |
-| `PHASE3_STATE_GINI_PLAN.md` | Frozen Phase 3 protocol (reproducibility) |
 | `PHASE3_METHODOLOGY_FIX.md` | Documents the anchor-fix decision |
-| `STUDY1_LOCK.md` | Frozen Study 1 commitments |
-| `paper_problem_question_report.md` | Problem/scope definition |
 | `phase3/state_gini_full_run_analysis.md` | Phase 3 results backing paper |
 | `phase3/state_gini_preflight_runs.md` | Preflight decisions |
 | `phase4/DIR_SCALED_RUN_REPORT.md` | Phase 4 results (discussion evidence) |
@@ -148,23 +146,38 @@ These docs' content is now entirely contained in the final paper draft:
 
 #### Files that are pure historical archive
 
-Already in `_archive/`: 24 markdown files (plans + historical). These are fine where they are.
+Already in `_archive/`: 41 markdown files (plans + historical + superseded visible docs). These are fine where they are.
 
-**Not** in `_archive/` but should be considered for archival:
+Still visible and should be considered for archival next:
 
 | File | Reason |
 |------|--------|
-| `GENTAGS_FULL_ANALYSIS_REPORT.md` | Old omnibus report, marked "secondary" in source-of-truth |
-| `PHASE3_STATUS.md` | Planning doc, superseded by actual results |
-| `PHASE3_INFOGRAPHIC.md` | Mermaid flowchart sketch |
-| `RESEARCH.md` | 854-byte placeholder |
-| `PHASE1_EXTRACTION.md` | Brief Phase 1 summary, content in EXTRACTION.md |
 | `phase3/STATE_GINI_FOLLOWUPS.md` | Follow-up plans (unclear if executed) |
 | `phase4/PHASE4_PLAN.md` | Planning doc |
 | `phase4/PHASE4_EXECUTION_SPEC.md` | Spec (useful for reproducibility) |
 | `phase4/PHASE4_PRERUN_CHECKLIST.md` | Checklist |
 | `phase4/DIR_MVP_RUN_REPORT.md` | Superseded by scaled run |
 | `phase4/sample_venue_test_design.md` | Design worksheet |
+
+Recently archived from visible `docs/` surface:
+
+- `docs/_archive/superseded/GENTAGS_FULL_ANALYSIS_REPORT.md`
+- `docs/_archive/superseded/PHASE3_STATUS.md`
+- `docs/_archive/superseded/PHASE3_INFOGRAPHIC.md`
+- `docs/_archive/superseded/RESEARCH.md`
+- `docs/_archive/superseded/SECTION3_GENTAGS.md`
+- `docs/_archive/superseded/SECTION3_REPRESENTATION.md`
+- `docs/_archive/superseded/SECTION4_EXPERIMENTAL_SETUP.md`
+- `docs/_archive/superseded/SECTION5_ANALYSIS_RESULTS.md`
+- `docs/_archive/superseded/SECTION6_DISCUSSION.md`
+- `docs/_archive/superseded/RESULTS.md`
+- `docs/_archive/superseded/PAPER_FIGURES.md`
+- `docs/_archive/superseded/APPENDIX_FAILURE_AUDIT.md`
+- `docs/_archive/superseded/PHASE3_STATE_GINI_PLAN.md`
+- `docs/_archive/superseded/STUDY1_LOCK.md`
+- `docs/_archive/superseded/paper_problem_question_report.md`
+- `docs/_archive/superseded/MOTIVATION.md`
+- `docs/_archive/superseded/PHASE1_EXTRACTION.md`
 
 ### 4.2 Results redundancy
 
@@ -202,7 +215,7 @@ This is what active scripts use for:
 - Phase 4 sample selection
 - Phase 5 venue sampling
 
-Docs that still point to `results/phase1/` should be treated as stale until corrected.
+This drift has been corrected in the current visible docs. Historical docs in `_archive/` may still mention older paths.
 
 ### 4.4 Script redundancy
 
@@ -250,7 +263,7 @@ Headline paper numbers in `PAPER_complete.md` match the canonical run artifacts.
 
 **Headline numeric claims spot-check correctly.**
 
-One caveat: `PAPER_SOURCE_OF_TRUTH.md` is still useful for artifact precedence, but some prose in it is stale. For example, it still says Sections 1 and 2 are "not yet written" even though `PAPER_STATUS.md` marks the full draft complete.
+`PAPER_SOURCE_OF_TRUTH.md` remains useful and is now aligned with the current draft status and Phase 1 local artifact path.
 
 ### 5.2 Figure references
 
@@ -307,14 +320,14 @@ All 14 figure references in `PAPER_complete.md` point to files that exist:
 
 No duplicates. Clear dependency chain: Phase 1 -> Phase 2 (cache) -> Phase 3 -> Phase 5.
 
-### 6.3 tests/ (4 files, mostly broken)
+### 6.3 tests/ (4 files, now passing)
 
 | File | Tests | Status |
 |------|-------|--------|
-| `test_hashes.py` | 6 | **PASSES** (imports from `gentags.config`) |
-| `test_parsing.py` | 8 | **BROKEN** (bad import) |
-| `test_filter.py` | 6 | **BROKEN** (bad import) |
-| `test_normalize.py` | 8 | **BROKEN** (bad import) |
+| `test_hashes.py` | 6 | **PASSES** |
+| `test_parsing.py` | 8 | **PASSES** |
+| `test_filter.py` | 6 | **PASSES** |
+| `test_normalize.py` | 8 | **PASSES** |
 
 ### 6.4 Dependencies (pyproject.toml)
 
@@ -349,21 +362,17 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 - **Clean dependency chain** between phases
 - **Figure paths** all resolve correctly
 - **Phase 1 outputs needed for later phases are present locally** in `results/phase1_downloaded/`
+- **Top-level docs surface is much smaller** after archiving superseded section drafts
 
 ### What needs fixing
 
 | Priority | Issue | Effort |
 |----------|-------|--------|
-| **HIGH** | 3/4 test files broken (import errors) | 10 min |
-| **HIGH** | `README.md` and `AGENTS.md` claim a passing test path and reference an archived smoke test | 10 min |
-| **HIGH** | Phase 1 execution/retrieval path is unclear across docs (`results/phase1/` vs `results/phase1_downloaded/`, local vs GCP VM) | 15 min |
 | **MEDIUM** | ~9 superseded Phase 5 result files cluttering `results/phase5/` | 5 min |
 | **MEDIUM** | `docs/plots/` has 14 unused figure copies (different names from paper refs) | 5 min |
 | **MEDIUM** | `data/phase5/baseline_config.json` is stale with no in-file warning | 2 min |
-| **MEDIUM** | `PAPER_SOURCE_OF_TRUTH.md` has stale section-status prose even though artifact precedence is still useful | 5 min |
 | **MEDIUM** | Config metadata is duplicated across `src/gentags/config.py` and `src/gentags/pipeline.py` | 15 min |
-| **MEDIUM** | `docs/PHASE1_EXTRACTION.md` points to `results/phase1/`, while active scripts use `results/phase1_downloaded/` | 5 min |
-| **LOW** | ~9 docs superseded by `PAPER_complete.md` (section drafts, RESULTS.md, etc.) | 15 min |
+| **MEDIUM** | Visible docs are now lean at the top level, but some secondary phase docs could still move into archive | 10 min |
 | **LOW** | `CLAUDE.md` is empty | 5 min |
 | **LOW** | `app/` directories are empty placeholders | 1 min |
 

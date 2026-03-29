@@ -1,6 +1,6 @@
 # Phase 3 — State-Gini: Runnable Protocol & Decision Log
 
-This document is the **single source of truth** for the **State-Gini experiment** in Phase 3. State-Gini is **one** of the things we do in Phase 3; other Phase 3 work (e.g. utility proof / attribution experiments) is separate and documented elsewhere (e.g. `docs/PHASE3_STATUS.md`, `docs/PHASE3_METHODOLOGY_FIX.md`).
+This document is the **single source of truth** for the **State-Gini experiment** in Phase 3. State-Gini is **one** of the things we do in Phase 3; other Phase 3 work (e.g. utility proof / attribution experiments) is separate and documented elsewhere (e.g. `docs/_archive/superseded/PHASE3_STATUS.md`, `docs/PHASE3_METHODOLOGY_FIX.md`).
 
 **Goals of this document:**
 
@@ -257,7 +257,7 @@ state_gini, counts, other_count = compute_state_gini(kw_embs, anchor_embeddings)
 
 ## 3. Other Phase 3 work (not this experiment)
 
-**Scope of this document:** This doc is only for the **State-Gini** experiment. Phase 3 also includes other work (e.g. utility proof: Judge LLM, DIR/INV attribution tests). Those are **separate** experiments with their own protocols—see `docs/PHASE3_STATUS.md` and `docs/PHASE3_METHODOLOGY_FIX.md`. You do **not** need Judge or DIR/INV to run or interpret State-Gini.
+**Scope of this document:** This doc is only for the **State-Gini** experiment. Phase 3 also includes other work (e.g. utility proof: Judge LLM, DIR/INV attribution tests). Those are **separate** experiments with their own protocols—see `docs/_archive/superseded/PHASE3_STATUS.md` and `docs/PHASE3_METHODOLOGY_FIX.md`. You do **not** need Judge or DIR/INV to run or interpret State-Gini.
 
 **What follows in §3.1–§3.9** is **context only** (for when you work on the utility proof later). It does not define what you run for State-Gini. State-Gini = structural proof only (this doc). Utility proof = other Phase 3 work (other docs).
 
@@ -389,7 +389,7 @@ The Judge LLM and DIR/INV experiments use frozen prompt templates (baseline deci
 2. **Run State-Gini (this experiment):**  
    Run for **gentags** and for **RAKE, TF-IDF, YAKE** with the frozen protocol. Produce Table 1: State-Gini by method. If gentags are not clearly more localized than baselines, the “new representation primitive” claim needs re-evaluation.
 
-3. **Other Phase 3 work:** Utility proof (Judge, DIR/INV) is a separate experiment; run after State-Gini if desired. See `docs/PHASE3_STATUS.md`.
+3. **Other Phase 3 work:** Utility proof (Judge, DIR/INV) is a separate experiment; run after State-Gini if desired. See `docs/_archive/superseded/PHASE3_STATUS.md`.
 
 ---
 
@@ -501,7 +501,7 @@ Fields to include: `phase`, `run_id`, `timestamp_utc`, `methodology`, `threshold
 
 **Other Phase 3 (utility proof):**
 
-- **(Other Phase 3)** DIR/INV pass rates apply to the utility proof, not State-Gini. See docs/PHASE3_STATUS.md. Original: DIR = score moves in expected direction (e.g. delete negative → score up). Report pass rate; target is significantly higher than CheckList’s ~34.6% failure rate (i.e. we want a high pass rate).
+- **(Other Phase 3)** DIR/INV pass rates apply to the utility proof, not State-Gini. See `docs/_archive/superseded/PHASE3_STATUS.md`. Original: DIR = score moves in expected direction (e.g. delete negative → score up). Report pass rate; target is significantly higher than CheckList’s ~34.6% failure rate (i.e. we want a high pass rate).
 - DIR/INV (utility proof only): pass = |Δscore| ≤ ε (e.g. ε = 2 or 3). Report pass rate; high pass rate supports “semantic stability under paraphrase.”
 
 ---

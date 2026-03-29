@@ -21,7 +21,7 @@ poetry run python scripts/state_gini_preflight.py --orthogonality --tau-sweep --
 | Pair | food_quality / service |
 | Pairs above 0.60 | **0** (none) |
 
-**Decision:** No change. Max 0.5817 is below 0.60, so we did **not** refine anchor phrases. Anchors stay as in `PHASE3_STATE_GINI_PLAN.md`.
+**Decision:** No change. Max 0.5817 is below 0.60, so we did **not** refine anchor phrases. Anchors stay as in `../_archive/superseded/PHASE3_STATE_GINI_PLAN.md`.
 
 ### Tau sweep (10 venues, 240 extractions)
 
