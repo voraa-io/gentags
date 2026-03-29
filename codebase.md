@@ -30,7 +30,7 @@ researchGentags/
 ├── data/                 Frozen inputs (venues, personas, configs)
 ├── results/              Run artifacts (manifests, summaries, plots)
 ├── docs/                 Paper-facing docs + 19 active markdown docs + 41 archived markdown docs
-├── notebooks/            4 Jupyter notebooks (exploratory)
+├── notebooks/            3 Jupyter notebooks (exploratory)
 ├── examples/             1 file (Phase 3 facet matching example)
 ├── issues/               1 file (resolved perf issue)
 ├── pyproject.toml        Poetry config
@@ -344,7 +344,7 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 |-----------|--------|--------|
 | `data/external/` | gitignored placeholder | Fine |
 | `data/sample/` | Empty placeholder | Fine |
-| `notebooks/` | 4 exploratory notebooks | Fine (dev tools) |
+| `notebooks/` | 3 exploratory notebooks | Fine (dev tools) |
 
 Resolved in cleanup:
 

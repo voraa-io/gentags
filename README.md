@@ -1,101 +1,106 @@
 # Gentags: Discrete Semantic State for Language-Based Systems
 
-Gentags (Generative Tags) are semantic attributes automatically extracted by large language models from sparse textual data (e.g., brief venue reviews).
+Gentags are short semantic attributes automatically extracted by large language models from text such as venue reviews.
 
-This repository contains the executed pipeline and frozen artifacts backing the Gentags paper. Canonical paper-backed outputs and reproduction instructions are listed in `docs/REPRODUCE_PAPER.md` and `docs/PAPER_SOURCE_OF_TRUTH.md`.
+This repository contains the full experimental pipeline and frozen artifacts supporting the Gentags paper. The project studies whether discrete semantic units extracted from text can improve consistency in constraint-sensitive decisions compared to lexical keyword representations.
 
-Gentags form a **persistent, inspectable semantic state** composed of discrete propositions (1–4 words). They externalize model judgments into an addressable representation that can be stored, compared, and updated. While machine-generated rather than user-contributed, gentags resemble folksonomies in structure and utility: they are interpretable, compositional, and arise without predefined taxonomies.
+Canonical paper artifacts and reproduction instructions are listed in:
 
----
-
-## Key Ideas
-
-- **Zero-shot semantic extraction** from review text
-- **No predefined ontology** or schema
-- **No ratings or sentiment labels**
-- **Short, atomized tags** (1–4 words)
-- **Interpretable and embed-friendly**
-- **Designed for sparse and cold-start settings**
-
-Gentags are treated as **semantic constraints**, not labels or summaries.
+- `docs/REPRODUCE_PAPER.md`
+- `docs/PAPER_SOURCE_OF_TRUTH.md`
 
 ---
 
-## Research Scope
+## Project
 
-This repository supports **Study 1** of the Gentags project.
+Study 1 evaluates whether representation structure affects consistency of constraint-sensitive decisions.
 
-**Study 1 focuses on:**
+The experiments examine:
 
-- Cross-model agreement (OpenAI, Gemini, Claude, Grok)
-- Prompt sensitivity
-- Stability across runs
-- Behavior under sparse review conditions
-- Reproducible, frozen extraction pipeline
+- stability across runs
+- sensitivity to prompt variation
+- cross-model agreement
+- structural properties of extracted tags
+- downstream decision behavior compared to lexical baselines
 
-**This repo does NOT include:**
+Out of scope for this repo:
 
-- Recommendation model training
-- User interaction logs
-- Product or UX experiments
-
----
-
-## Methodological Commitments (Study 1 Lock)
-
-- Models are used **as provided** (no temperature, top-p, or decoding tuning)
-- Gentags are extracted **zero-shot** (no examples, no few-shot prompting)
-- No predefined semantic categories or ontology
-- Ratings are explicitly excluded from extraction
-- Output validity refers to **format correctness only**, not semantic truth
-
-All definitions, prompts, model identifiers, and reproduction guidance are documented in `docs/EXTRACTION.md` and `docs/REPRODUCE_PAPER.md`.
+- recommendation training
+- user interaction data
+- UX evaluation
 
 ---
 
-## Repository Structure
+## Key Properties
 
+Gentags are:
+
+- extracted zero-shot from text
+- short (1-4 words)
+- schema-free
+- interpretable by humans
+- usable as structured semantic features
+- designed for sparse text settings
+
+They function as compact semantic hypotheses derived from evidence text.
+
+---
+
+## Key Findings
+
+- Gentags show high semantic stability across runs (`cosine = 0.977`).
+- Gentags improve agreement with full-evidence decisions compared to lexical baselines.
+- Gentags improve hard-constraint compliance in controlled decision tasks.
+
+More detailed results are in `docs/PAPER_complete.md`.
+
+---
+
+## Repo Map
+
+```text
+src/gentags/   Core extraction pipeline
+scripts/       Phase runners and analysis scripts
+tests/         Unit tests
+data/          Frozen inputs and sampled datasets
+results/       Paper-backed outputs and archived runs
+docs/          Paper-facing documentation
+notebooks/     Exploratory analysis notebooks
 ```
-src/gentags/          # Extraction pipeline (importable)
-notebooks/            # Reproducible experiments and analysis
-scripts/              # CLI runners and utilities
-docs/                 # Methodology and study documentation
-data/                 # Datasets (see data/README.md)
-  ├── sample/         # Small public-safe example data
-  └── study1_venues_20250117.csv  # Main dataset
-results/              # Experiment outputs (see results/README.md)
-  ├── meta/           # Reproducibility manifests
-  └── examples/       # Example outputs (small, non-sensitive)
-tests/                # Unit tests (no API keys required)
-```
+
+Core paper-facing docs:
+
+- `docs/PAPER_complete.md`
+- `docs/PAPER_SOURCE_OF_TRUTH.md`
+- `docs/PAPER_STATUS.md`
+- `docs/REPRODUCE_PAPER.md`
+
+Canonical paper-backed artifact locations:
+
+- `results/phase1_downloaded/`
+- `results/phase2/`
+- `results/phase3/`
+- `results/phase3a/`
+- `results/phase4/`
+- `results/phase5/`
 
 ---
 
 ## Quick Start
 
-### Setup
+Install dependencies:
 
 ```bash
-# Install Poetry (if not installed)
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
 poetry install
-
-# Set up API keys (optional - tests pass without them)
-cp .env.example .env
-# Edit .env and add your API keys for models you want to use
 ```
 
-### Verify Installation
-
-Run unit tests (no API keys required):
+Run unit tests:
 
 ```bash
 poetry run pytest tests/
 ```
 
-Validate the Phase 1 entry point without API calls:
+Validate the Phase 1 entry point without making API calls:
 
 ```bash
 poetry run python scripts/run_phase1.py \
@@ -107,145 +112,49 @@ poetry run python scripts/run_phase1.py \
   --dry-run
 ```
 
-### Sample Run
+Environment notes:
 
-```python
-from gentags import (
-    GentagExtractor,
-    run_experiment,
-    load_venue_data,
-    summarize_cost,
-    save_results
-)
-
-# Load data
-df = load_venue_data("data/study1_venues_20250117.csv", sample_size=10)
-
-# Initialize extractor
-extractor = GentagExtractor()
-
-# Run experiment
-results = run_experiment(
-    extractor=extractor,
-    venues_df=df,
-    models=["openai"],
-    prompts=["minimal"],
-    runs=1
-)
-
-# Save results
-output_path = save_results(results, prefix="gentags")
-print(f"Results saved to: {output_path}")
-
-# Analyze costs
-summary = summarize_cost(results)
-print(f"Total cost: ${summary['total_cost_usd']:.6f}")
-print(f"Avg cost per extraction: ${summary['avg_cost_per_extraction_usd']:.6f}")
-```
-
-### Output Files
-
-Each experiment run produces:
-
-- `results/gentags_<timestamp>.csv` - Full results (one row per tag)
-- `results/meta/manifest_<timestamp>.json` - Reproducibility manifest
-
-Use `summarize_cost()` to generate:
-
-- Extraction-level CSV (one row per extraction)
-- Cost breakdown by model/prompt
-
-See `docs/REPRODUCE_PAPER.md` for the canonical paper reproduction path.
+- Python and dependency management are handled through Poetry.
+- API keys belong in `.env` when running extraction or other model-backed scripts.
+- Full paper reproduction guidance is in `docs/REPRODUCE_PAPER.md`.
 
 ---
 
-## License & Citation
+## Reproducing The Paper
 
-This repository is released under the MIT License.
+Use `docs/REPRODUCE_PAPER.md` as the main operational guide.
 
-If you use this work, please cite:
+That file covers:
 
-```
-Gentags: Emergent Semantic Tags from Sparse Reviews
-(CITATION.cff provided)
-```
+- canonical artifact paths
+- phase-by-phase commands
+- frozen vs expensive stages
+- which outputs back the paper
+
+---
+
+## Paper
+
+- Draft: `docs/PAPER_complete.md`
+- Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
+- Submission status: `docs/PAPER_STATUS.md`
 
 ---
 
 ## Status
 
-### Study 1 Progress
+Study 1 repo status:
 
-| Section | Description | Status |
-|---------|-------------|--------|
-| Motivation | Persistent, addressable semantic state | ✅ Complete |
-| Phase 1 | Extraction pipeline & multi-model runs | ✅ Complete |
-| Phase 2 | Semantic stability analysis | ✅ Complete |
-| Phase 3 | Structural analysis (State-Gini + baselines) | ✅ Complete |
-| Phase 4 | DIR intervention probe | ✅ Complete |
-| Phase 5 | Decision evaluation vs lexical baselines | ✅ Complete |
-
-### Paper Entry Points
-
-- Paper draft: `docs/PAPER_complete.md`
-- Reproduction guide: `docs/REPRODUCE_PAPER.md`
-- Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
-- Status tracker: `docs/PAPER_STATUS.md`
-
-### Core Thesis
-
-> Gentags occupy an intermediate point between symbolic keywords and dense embeddings: **semantic enough to generalize, lexical enough to attribute.**
-
-### Claims
-
-| Claim (Phase 2 validated) | Evidence | Implication |
-|--------------------------|----------|-------------|
-| Gentags are semantically stable | Cosine 0.977 | Representation can serve as state |
-| Gentags vary lexically | Jaccard 0.471 | Stability is semantic, not surface |
-| Evidence-sensitive dispersion | r = -0.230 | Less evidence → less identifiability |
-| Retention above random | +0.164 | Tags preserve source meaning |
-
-### Paper-Backed Artifact Locations
-
-- Phase 1 local artifacts used by later phases: `results/phase1_downloaded/`
-- Phase 2 outputs: `results/phase2/`
-- Phase 3 outputs: `results/phase3/` and `results/phase3a/`
-- Phase 5 canonical outputs: `results/phase5/`
-
-### Key Numbers
-
-| Metric (Phase 2) | Value |
-|------------------|-------|
-| Semantic stability (cosine) | 0.977 |
-| Surface variation (Jaccard) | 0.471 |
-| Semantic gap (cosine - Jaccard) | 0.504 |
-| Retention above random | +0.164 |
-| Evidence-variability correlation | -0.230 |
-| Localization Gini (embeddings) | 0.369 |
-| **Localization advantage** | **1.50×** |
-| Paraphrase MMC | 0.648 |
-
-See `docs/PAPER_complete.md` for the core paper claims.
-See `docs/EXTRACTION.md` for extraction details and methodology.
+- Phase 1: complete
+- Phase 2: complete
+- Phase 3: complete
+- Phase 4: complete (supporting mechanism evidence)
+- Phase 5: complete
 
 ---
 
-## Documentation
+## License And Citation
 
-| Document | Description |
-|----------|-------------|
-| `docs/PAPER_complete.md` | Full paper draft |
-| `docs/PAPER_SOURCE_OF_TRUTH.md` | Claim-to-artifact map |
-| `docs/PAPER_STATUS.md` | Submission status and open items |
-| `docs/REPRODUCE_PAPER.md` | Canonical commands, artifact paths, and rerun guidance |
-| `docs/PHASE2_STABILITY.md` | Semantic stability analysis |
-| `docs/EXTRACTION.md` | Extraction method and file references |
-| `docs/PHASE3_METHODOLOGY_FIX.md` | Final methodological adjustment for Phase 3 |
+This repository is released under the MIT License.
 
----
-
-## Out of Scope
-
-- **Study 2** (applied recommendation & UX): Separate repository
-- **pdensity**: Exploratory, not central contribution
-- **User studies**: Not in this paper
+Citation metadata is provided in `CITATION.cff`.

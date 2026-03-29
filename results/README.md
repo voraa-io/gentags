@@ -144,7 +144,7 @@ by_model_prompt = summary["by_model_prompt"]
 See notebooks for analysis:
 
 - `notebooks/02_phase1_analysis.ipynb`: Stability analysis
-- `notebooks/03_reconstruction_eval.ipynb`: Reconstruction evaluation
+- `notebooks/phase2_explore.ipynb`: Phase 2 results exploration
 
 ## Gitignore
 
