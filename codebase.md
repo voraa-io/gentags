@@ -31,11 +31,9 @@ researchGentags/
 ├── results/              Run artifacts (manifests, summaries, plots)
 ├── docs/                 Paper-facing docs + 19 active markdown docs + 41 archived markdown docs
 ├── notebooks/            4 Jupyter notebooks (exploratory)
-├── app/                  Empty (backend/ + frontend/ placeholders)
 ├── examples/             1 file (Phase 3 facet matching example)
 ├── issues/               1 file (resolved perf issue)
 ├── pyproject.toml        Poetry config
-├── CLAUDE.md             Empty
 ├── AGENTS.md             Repo guidelines
 ├── README.md             Project overview
 ├── SETUP.md              Environment setup
@@ -344,12 +342,14 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| `app/backend/` | Empty dir | Delete or .gitkeep |
-| `app/frontend/` | Empty dir | Delete or .gitkeep |
-| `CLAUDE.md` | Empty file (0 bytes) | Write project instructions or delete |
 | `data/external/` | gitignored placeholder | Fine |
 | `data/sample/` | Empty placeholder | Fine |
 | `notebooks/` | 4 exploratory notebooks | Fine (dev tools) |
+
+Resolved in cleanup:
+
+- deleted empty `CLAUDE.md`
+- deleted unused empty `app/backend/` and `app/frontend/` placeholders
 
 ---
 
@@ -372,8 +372,6 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 |----------|-------|--------|
 | **MEDIUM** | Config metadata is duplicated across `src/gentags/config.py` and `src/gentags/pipeline.py` | 15 min |
 | **MEDIUM** | Visible docs are now lean at the top level, but some secondary phase docs could still move into archive | 10 min |
-| **LOW** | `CLAUDE.md` is empty | 5 min |
-| **LOW** | `app/` directories are empty placeholders | 1 min |
 
 ### Open items for the paper
 
@@ -409,8 +407,7 @@ This is the current repo-cleanup execution order. Treat it as the working checkl
    - which files back the paper
 4. Clean obvious clutter:
    - stale Phase 5 config warning / archival
-   - empty `CLAUDE.md`
-   - empty `app/` placeholders if unused
+   - empty placeholders if unused
 5. Reduce source-of-truth drift across docs:
    - fix `PHASE1_EXTRACTION.md`
    - fix stale status prose in `PAPER_SOURCE_OF_TRUTH.md`
