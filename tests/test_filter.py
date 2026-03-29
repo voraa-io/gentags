@@ -3,8 +3,7 @@ Unit tests for tag filtering (word count constraints).
 No API keys required.
 """
 
-import pytest
-from gentags.normalize import filter_valid_tags
+from gentags.pipeline import filter_valid_tags
 
 
 def test_filter_valid_tags_within_limit():
@@ -53,4 +52,3 @@ def test_filter_valid_tags_custom_max():
     valid, filtered = filter_valid_tags(tags, max_words=2)
     assert valid == ["one", "two words"]
     assert filtered == ["three word tag"]
-

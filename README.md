@@ -2,6 +2,8 @@
 
 Gentags (Generative Tags) are semantic attributes automatically extracted by large language models from sparse textual data (e.g., brief venue reviews).
 
+This repository contains the executed pipeline and frozen artifacts backing the Gentags paper. Canonical paper-backed outputs and reproduction instructions are listed in `docs/REPRODUCE_PAPER.md` and `docs/PAPER_SOURCE_OF_TRUTH.md`.
+
 Gentags form a **persistent, inspectable semantic state** composed of discrete propositions (1–4 words). They externalize model judgments into an addressable representation that can be stored, compared, and updated. While machine-generated rather than user-contributed, gentags resemble folksonomies in structure and utility: they are interpretable, compositional, and arise without predefined taxonomies.
 
 ---
@@ -93,10 +95,16 @@ Run unit tests (no API keys required):
 poetry run pytest tests/
 ```
 
-Run smoke test (skips gracefully if no API keys):
+Validate the Phase 1 entry point without API calls:
 
 ```bash
-poetry run python scripts/smoke_test_minimal.py
+poetry run python scripts/run_phase1.py \
+  --data data/study1_venues_20250117.csv \
+  --sample-size 10 \
+  --models openai \
+  --prompts minimal \
+  --runs 1 \
+  --dry-run
 ```
 
 ### Sample Run
@@ -173,8 +181,16 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 | Motivation | Persistent, addressable semantic state | ✅ Complete |
 | Phase 1 | Extraction pipeline & multi-model runs | ✅ Complete |
 | Phase 2 | Semantic stability analysis | ✅ Complete |
-| Phase 3 | Structural proof (State-Gini) + Utility proof (DIR/INV) | 🔜 Planned |
-| Phase 4 | Downstream probes | 🔜 Planning |
+| Phase 3 | Structural analysis (State-Gini + baselines) | ✅ Complete |
+| Phase 4 | DIR intervention probe | ✅ Complete |
+| Phase 5 | Decision evaluation vs lexical baselines | ✅ Complete |
+
+### Paper Entry Points
+
+- Paper draft: `docs/PAPER_complete.md`
+- Reproduction guide: `docs/REPRODUCE_PAPER.md`
+- Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
+- Status tracker: `docs/PAPER_STATUS.md`
 
 ### Core Thesis
 
@@ -189,10 +205,12 @@ Gentags: Emergent Semantic Tags from Sparse Reviews
 | Evidence-sensitive dispersion | r = -0.230 | Less evidence → less identifiability |
 | Retention above random | +0.164 | Tags preserve source meaning |
 
-### Planned Phase 3 Tests
+### Paper-Backed Artifact Locations
 
-- Structural proof: State-Gini factorization (gentags vs RAKE/TF-IDF/YAKE)
-- Utility proof: CheckList DIR/INV interventions (gentags vs embeddings)
+- Phase 1 local artifacts used by later phases: `results/phase1_downloaded/`
+- Phase 2 outputs: `results/phase2/`
+- Phase 3 outputs: `results/phase3/` and `results/phase3a/`
+- Phase 5 canonical outputs: `results/phase5/`
 
 ### Key Numbers
 
@@ -221,6 +239,7 @@ See `docs/MOTIVATION.md` for why gentags are necessary.
 | `docs/PHASE2_STABILITY.md` | Semantic stability analysis |
 | `docs/SECTION3_REPRESENTATION.md` | **Core claims: localization, baselines, boundaries** |
 | `docs/STUDY1_LOCK.md` | Frozen methodology |
+| `docs/REPRODUCE_PAPER.md` | Canonical commands, artifact paths, and rerun guidance |
 
 ---
 

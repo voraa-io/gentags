@@ -3,8 +3,7 @@ Unit tests for tag normalization.
 No API keys required.
 """
 
-import pytest
-from gentags.normalize import normalize_tag, normalize_tag_eval
+from gentags.pipeline import normalize_tag, normalize_tag_eval
 
 
 def test_normalize_tag_lowercase():
@@ -70,4 +69,3 @@ def test_normalize_tag_eval_preserves_non_plural():
     """Test that non-plural words are preserved."""
     assert normalize_tag_eval("great food") == "great food"
     assert normalize_tag_eval("cozy atmosphere") == "cozy atmosphere"
-

@@ -3,8 +3,7 @@ Unit tests for JSON parsing (extract_json_list).
 No API keys required.
 """
 
-import pytest
-from gentags.parsing import extract_json_list
+from gentags.pipeline import extract_json_list
 
 
 def test_parse_simple_list():
@@ -69,4 +68,3 @@ def test_parse_filters_empty_strings():
     tags, status = extract_json_list(text)
     assert status == "success"
     assert tags == ["tag1", "tag2"]
-
