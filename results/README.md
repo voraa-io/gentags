@@ -2,160 +2,120 @@
 
 ## Overview
 
-This directory contains output from gentag extraction experiments. Most results are gitignored to avoid committing large files or sensitive data.
+This directory contains frozen artifacts, phase outputs, plots, manifests, and smaller exploratory runs produced during development of the Gentags paper.
 
-## Structure
+For the paper-backed reproduction path, the canonical result locations are:
 
-```
+- `results/phase1_downloaded/`
+- `results/phase2/`
+- `results/phase3/`
+- `results/phase3a/`
+- `results/phase4/`
+- `results/phase5/`
+
+Archived non-canonical outputs live in `results/_archive/`.
+
+## Current Structure
+
+```text
 results/
-├── README.md          # This file
-├── meta/              # Metadata files (public-safe)
-│   └── [manifest files]
-├── examples/           # Small example outputs (optional)
-│   └── [example files]
-├── raw/               # Raw model responses (gitignored)
-│   └── [error responses]
-└── [timestamped CSV files]  # Main results (gitignored)
+├── README.md
+├── _archive/                 Archived non-canonical results
+├── figures/                  Paper-facing figures
+├── meta/                     Early extraction manifests
+├── phase1_downloaded/        Canonical local copy of Phase 1 outputs
+├── phase2/                   Stability analysis outputs
+├── phase2_cache/             Embedding cache for Phase 2/3 analyses
+├── phase3/                   State-Gini analysis outputs
+├── phase3a/                  Phase 3 baseline outputs
+├── phase3b/                  Additional Phase 3 plots/tables
+├── phase4/                   DIR supporting experiment outputs
+├── phase5/                   Canonical decision-evaluation outputs
+├── raw/                      Raw model responses and diagnostics
+├── test_grok/                Small test run outputs
+├── test_phase1/              Small Phase 1 test run outputs
+└── week2_run_*.csv           Early extraction outputs retained for provenance
 ```
 
-## Output Format
+## Paper-Backed Outputs
 
-### Main Results CSV
+### Phase 1
 
-Results are saved as CSV files with naming convention:
+Canonical local extraction artifacts used by later phases:
 
-```
-gentags_YYYYMMDD_HHMMSS.csv
-phase1_YYYYMMDD_HHMMSS.csv
-```
+- `results/phase1_downloaded/*`
 
-**Columns:**
+These are treated as frozen local inputs for downstream analyses.
 
-- `run_id`: Unique run identifier
-- `venue_id`: Venue identifier
-- `venue_name`: Venue name
-- `model`: Model name used
-- `prompt_type`: Prompt type used
-- `run_number`: Run number (1, 2, ...)
-- `exp_id`: Experiment identifier
-- `timestamp`: Extraction timestamp
-- `tag_raw`: Raw extracted tag
-- `tag_norm`: Normalized tag (for matching)
-- `tag_norm_eval`: Strictly normalized tag (for stability metrics)
-- `word_count`: Number of words in tag
-- `num_reviews`: Number of reviews for venue
-- `reviews_total_chars`: Total characters in reviews
-- `time_seconds`: Extraction time
-- `input_tokens`: Input token count
-- `output_tokens`: Output token count
-- `total_tokens`: Total token count
-- `cost_usd`: Estimated cost in USD
-- `status`: Extraction status ("success", "parse_error", "error")
-- `prompt_hash`: Hash of prompt version
-- `system_prompt_hash`: Hash of system prompt
-- `input_prompt_hash`: Hash of exact prompt sent
-- `tags_filtered_count`: Number of tags filtered out
-- `extraction_phase`: Phase identifier ("phase1")
+### Phase 2
 
-### Raw Responses
+Stability analysis outputs:
 
-Raw model responses are saved in `results/raw/` for:
+- `results/phase2/plots/`
+- `results/phase2/tables/`
+- `results/phase2/phase2_manifest.json`
 
-- Debugging parse errors
-- Auditing model outputs
-- Error analysis
+### Phase 3
 
-**Naming:** `{exp_id}_{run_id}.txt`
+Structure analysis outputs:
 
-### Extraction-Level CSV (from summarize_cost)
+- `results/phase3/plots/`
+- `results/phase3/tables/`
+- `results/phase3/*.json`
 
-Use `summarize_cost()` to generate extraction-level CSVs (one row per extraction):
+Baseline comparison outputs:
 
-```python
-from gentags import summarize_cost, load_results
+- `results/phase3a/plots/`
+- `results/phase3a/tables/`
 
-df = load_results("results/gentags_20250117_120000.csv")
-summary = summarize_cost(df)
+### Phase 4
 
-# Save extraction-level CSV
-summary["extractions"].to_csv("results/extractions_20250117.csv", index=False)
+Supporting mechanism evidence (DIR):
 
-# Save cost breakdown by model/prompt
-summary["by_model_prompt"].to_csv("results/cost_by_model_prompt_20250117.csv", index=False)
-```
+- `results/phase4/dir_manifest_*.json`
+- `results/phase4/dir_results_*.json`
+- `results/phase4/dir_summary_*.json`
+- `results/phase4/scaled_aggregate.json`
 
-**Extraction-level columns:**
+### Phase 5
 
-- All metadata columns (run_id, exp_id, venue_id, model, prompt_type, etc.)
-- `n_tags`: Number of tags extracted
-- `n_unique_tag_eval`: Number of unique tags (after eval normalization)
-- `cost_per_tag`: Cost per tag
-- `cost_per_unique_tag`: Cost per unique tag
+Canonical decision-evaluation outputs:
 
-### Metadata Files (Manifests)
+- `results/phase5/baseline_manifest_openai_20260228_022320.json`
+- `results/phase5/baseline_manifest_claude_20260228_032717.json`
+- `results/phase5/baseline_summary_openai_20260228_022320.json`
+- `results/phase5/baseline_summary_claude_20260228_032717.json`
+- `results/phase5/baseline_legibility_analysis.json`
+- `results/phase5/gentag_fer_disagreements.csv`
+- `results/phase5/plots/`
 
-Manifest files in `results/meta/` are JSON files containing:
+## Historical And Exploratory Outputs
 
-- **Git info:** commit hash, branch, dirty status
-- **System info:** Python version, OS, platform
-- **Pipeline info:** pipeline version, prompt/model hashes and versions
-- **Dependencies:** Poetry lock hash
-- **Dataset info:** name, path, row count, filters applied
+The following are retained for provenance or development history, but are not the main paper-backed artifact path:
 
-**Naming:** `manifest_YYYYMMDD_HHMMSS.json`
+- `results/meta/`
+- `results/raw/`
+- `results/test_grok/`
+- `results/test_phase1/`
+- `results/smoke_test_*.csv`
+- `results/week2_run_*.csv`
 
-**Generated by:** `scripts/generate_manifest.py`
+If a current doc conflicts with archived or exploratory results, prefer the canonical phase directories above.
 
-## Usage
+## Analysis Notebooks
 
-### Loading Results
+Exploratory notebooks live in `notebooks/` and are not treated as canonical paper artifacts.
 
-```python
-from gentags import load_results, summarize_cost
+Currently retained:
 
-# Load main results (one row per tag)
-df = load_results("results/gentags_20250117_120000.csv")
+- `notebooks/02_phase1_analysis.ipynb`
+- `notebooks/04_stability_exploration.ipynb`
+- `notebooks/phase2_explore.ipynb`
 
-# Filter to successful extractions
-df_success = df[df['status'] == 'success']
-df_tags = df_success[df_success['tag_raw'].notna()]
-```
+## Reproduction Guidance
 
-### Cost Analysis
+Use these docs for paper verification and reruns:
 
-```python
-# Generate cost summary
-summary = summarize_cost(df)
-
-# Access totals
-print(f"Total cost: ${summary['total_cost_usd']:.6f}")
-print(f"Avg cost per extraction: ${summary['avg_cost_per_extraction_usd']:.6f}")
-print(f"Avg cost per tag: ${summary['avg_cost_per_tag_usd']:.6f}")
-
-# Access extraction-level data (one row per extraction)
-extractions = summary["extractions"]
-
-# Access cost breakdown by model/prompt
-by_model_prompt = summary["by_model_prompt"]
-```
-
-## Analysis
-
-See notebooks for analysis:
-
-- `notebooks/02_phase1_analysis.ipynb`: Stability analysis
-- `notebooks/phase2_explore.ipynb`: Phase 2 results exploration
-
-## Gitignore
-
-The following are gitignored:
-
-- `*.csv` (main results files)
-- `raw/` (raw responses)
-- Large output files
-
-The following are committed:
-
-- `README.md` (this file)
-- `meta/` (metadata, if public-safe)
-- `examples/` (small examples, if included)
+- `docs/REPRODUCE_PAPER.md`
+- `docs/PAPER_SOURCE_OF_TRUTH.md`
+- `docs/PAPER_complete.md`

@@ -7,7 +7,6 @@ This is the shortest path to understanding and reproducing the paper-backed outp
 - Paper draft: `docs/PAPER_complete.md`
 - Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
 - Paper status: `docs/PAPER_STATUS.md`
-- Cleanup / repo hygiene tracker: `codebase.md`
 
 ## 2. Install And Verify
 
@@ -201,7 +200,6 @@ Use these docs together:
 
 - `docs/PAPER_complete.md` for the written paper
 - `docs/PAPER_SOURCE_OF_TRUTH.md` for claim-to-artifact mapping
-- `codebase.md` for current cleanup decisions and known repo drift
 
 If docs conflict with executed artifacts or active scripts, prefer:
 
