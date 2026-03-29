@@ -181,20 +181,20 @@ Recently archived from visible `docs/` surface:
 
 ### 4.2 Results redundancy
 
-Phase 5 has superseded files still on disk:
+Phase 5 previously had superseded files mixed into the canonical output directory. These have now been archived to `results/_archive/phase5/`:
 
 | File | Status |
 |------|--------|
-| `baseline_manifest_20260223_051347.json` | Superseded (pre-v2, 3 personas) |
-| `baseline_summary_20260223_051347.json` | Superseded |
-| `baseline_results_20260223_051347.json` | Superseded |
-| `baseline_results_20260223_052658_partial.json` | Partial run |
-| `baseline_results_20260223_062343_partial.json` | Partial run |
-| `baseline_summary_48venues.json` | Old partial slice |
-| `baseline_manifest_claude_20260228_015756.json` | Early Claude iteration |
-| `baseline_summary_claude_20260228_015756.json` | Early Claude iteration |
-| `baseline_results_claude_20260228_015756.json` | Early Claude iteration |
-| `checkpoint.json` | Leftover checkpoint |
+| `results/_archive/phase5/baseline_manifest_20260223_051347.json` | Superseded (pre-v2, 3 personas) |
+| `results/_archive/phase5/baseline_summary_20260223_051347.json` | Superseded |
+| `results/_archive/phase5/baseline_results_20260223_051347.json` | Superseded |
+| `results/_archive/phase5/baseline_results_20260223_052658_partial.json` | Partial run |
+| `results/_archive/phase5/baseline_results_20260223_062343_partial.json` | Partial run |
+| `results/_archive/phase5/baseline_summary_48venues.json` | Old partial slice |
+| `results/_archive/phase5/baseline_manifest_claude_20260228_015756.json` | Early Claude iteration |
+| `results/_archive/phase5/baseline_summary_claude_20260228_015756.json` | Early Claude iteration |
+| `results/_archive/phase5/baseline_results_claude_20260228_015756.json` | Early Claude iteration |
+| `results/_archive/phase5/checkpoint.json` | Leftover checkpoint |
 
 **Canonical Phase 5 artifacts (keep):**
 - `*_openai_20260228_022320.*` (primary judge)
@@ -368,7 +368,6 @@ All reasonable. Versions are constrained by ranges, not pinned exactly.
 
 | Priority | Issue | Effort |
 |----------|-------|--------|
-| **MEDIUM** | ~9 superseded Phase 5 result files cluttering `results/phase5/` | 5 min |
 | **MEDIUM** | `docs/plots/` has 14 unused figure copies (different names from paper refs) | 5 min |
 | **MEDIUM** | `data/phase5/baseline_config.json` is stale with no in-file warning | 2 min |
 | **MEDIUM** | Config metadata is duplicated across `src/gentags/config.py` and `src/gentags/pipeline.py` | 15 min |
@@ -409,7 +408,6 @@ This is the current repo-cleanup execution order. Treat it as the working checkl
    - which local artifacts are canonical
    - which files back the paper
 4. Clean obvious clutter:
-   - superseded Phase 5 result files
    - duplicate `docs/plots/` copies
    - stale Phase 5 config warning / archival
    - empty `CLAUDE.md`
@@ -431,6 +429,10 @@ This is the current repo-cleanup execution order. Treat it as the working checkl
   - `results/phase5/baseline_manifest_openai_20260228_022320.json`
   - `results/phase5/baseline_manifest_claude_20260228_032717.json`
   - `results/phase5/baseline_legibility_analysis.json`
+
+Archived non-canonical Phase 5 artifacts now live in:
+
+- `results/_archive/phase5/`
 
 ### 9.4 Important cleanup rule
 

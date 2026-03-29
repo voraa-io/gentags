@@ -39,9 +39,9 @@ These files should **not** be used as primary sources for current paper claims w
 | File | Issue | Status |
 |------|-------|--------|
 | `data/phase5/baseline_config.json` | Describes older 3-persona / 4-system design | **STALE** |
-| `results/phase5/baseline_manifest_20260223_051347.json` | Older pre-v2 run | Superseded |
-| `results/phase5/baseline_summary_20260223_051347.json` | Older pre-v2 run | Superseded |
-| `results/phase5/baseline_summary_48venues.json` | Partial/older slice | Superseded |
+| `results/_archive/phase5/baseline_manifest_20260223_051347.json` | Older pre-v2 run | Superseded |
+| `results/_archive/phase5/baseline_summary_20260223_051347.json` | Older pre-v2 run | Superseded |
+| `results/_archive/phase5/baseline_summary_48venues.json` | Partial/older slice | Superseded |
 | `docs/_archive/superseded/GENTAGS_FULL_ANALYSIS_REPORT.md` | Useful context, but Phase 3 framing is outdated | Secondary |
 | `docs/_archive/**` | Historical planning and older narratives | Historical only |
 
