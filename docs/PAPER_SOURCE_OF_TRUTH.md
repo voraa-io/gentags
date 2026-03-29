@@ -2,7 +2,7 @@
 
 > **Purpose:** Define which files are authoritative for paper claims, especially numeric results and experimental setup.
 > **Scope:** Whole paper, with special attention to Section 4 / Phase 5.
-> **Last verified:** 2026-03-07
+> **Last verified:** 2026-03-28
 
 ---
 
@@ -53,17 +53,17 @@ For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
 
 ### Section 1. Introduction
 
-**Current status:** not yet written  
+**Current status:** written in `docs/PAPER_complete.md`  
 **Use as inputs:**
 - `docs/paper_problem_question_report.md`
 - `docs/MOTIVATION.md` as background only
-- Results sections below after they are finalized
+- verified results sections below for finalized claims
 
 **Do not use as sole authority:** old framing docs in `docs/_archive/`
 
 ### Section 2. Related Work
 
-**Current status:** not yet written  
+**Current status:** written in `docs/PAPER_complete.md`  
 **Use as inputs:**
 - literature notes to be gathered separately
 - `docs/paper_problem_question_report.md` for framing boundaries only
@@ -76,7 +76,7 @@ For current Phase 5 claims, use the 2026-02-28 v2 artifacts.
 **Authority for protocol details:**
 - `src/gentags/pipeline.py`
 - `data/study1_venues_20250117.csv`
-- `results/phase1/*`
+- `results/phase1_downloaded/*`
 
 **Use for paper writing:**
 - prose, definitions, prompt text, and taxonomy from `docs/EXTRACTION.md`
@@ -302,4 +302,3 @@ When writing paper text:
 ### One-line rule
 
 If a sentence contains a number, the number should be traceable to `results/` or a frozen `data/` file.
-

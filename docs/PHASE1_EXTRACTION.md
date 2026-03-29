@@ -23,7 +23,11 @@
 
 ## Output
 
-Results in `results/phase1/`:
+Current local canonical copy of Phase 1 outputs: `results/phase1_downloaded/`
+
+Files:
 - `*_tags.csv` — one row per tag
 - `*_extractions.csv` — one row per extraction
 - `meta/*_manifest.json` — reproducibility metadata
+
+Note: the full Phase 1 extraction appears to have been run on a Google Cloud VM and then copied back locally. Downstream Phase 2/3/5 scripts use `results/phase1_downloaded/`, not `results/phase1/`.

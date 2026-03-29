@@ -214,6 +214,6 @@ Gentag extraction is cheap ($12.61 for 13,272 extractions), scalable (100% compl
 ## File References
 
 - Pipeline source: `src/gentags/pipeline.py`
-- Extraction results: `results/phase1/*_tags.csv`, `*_extractions.csv`
-- Manifests: `results/phase1/meta/*_manifest.json`
+- Extraction results (current local canonical copy): `results/phase1_downloaded/*_tags.csv`, `*_extractions.csv`
+- Manifests: `results/phase1_downloaded/` plus `results/meta/*manifest*.json` for committed metadata
 - Data: `data/study1_venues_20250117.csv` (553 venues)
