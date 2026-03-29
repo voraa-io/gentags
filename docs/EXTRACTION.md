@@ -87,7 +87,7 @@ Gentags are extracted by prompting a large language model with venue reviews and
 
 | Parameter | Value |
 |-----------|-------|
-| Source data | 553 venues, each with 1-20 user reviews |
+| Source data | 553 venues in the executed Phase 1 set, each with 1-5 review objects |
 | Models | 4 (see Section 2.4) |
 | Prompts | 3 variants (see Section 2.2) |
 | Runs per configuration | 2 |
@@ -216,4 +216,4 @@ Gentag extraction is cheap ($12.61 for 13,272 extractions), scalable (100% compl
 - Pipeline source: `src/gentags/pipeline.py`
 - Extraction results (current local canonical copy): `results/phase1_downloaded/*_tags.csv`, `*_extractions.csv`
 - Manifests: `results/phase1_downloaded/` plus `results/meta/*manifest*.json` for committed metadata
-- Data: `data/study1_venues_20250117.csv` (553 venues)
+- Data: `data/study1_venues_20250117.csv` with a 553-venue executed Phase 1 subset

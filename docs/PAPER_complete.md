@@ -132,7 +132,7 @@ We evaluate Gentags through three complementary studies targeting different prop
 
 ## 4.1 Data
 
-All studies draw from a shared corpus of 553 venues, each associated with 1–20 user reviews. Gentags and all baseline representations are derived from this same underlying evidence.
+All studies draw from a shared executed extraction corpus of 553 venues. In the canonical Phase 1 subset used by the repo, venues contain 1–5 review objects each. Gentags and all baseline representations are derived from this same underlying evidence.
 
 Different studies operate on fixed subsets of this corpus depending on their requirements. Stability and structural analyses use a subset of venues with successful extractions across all models to enable controlled comparison. The decision evaluation uses a stratified subset of 50 venues designed to ensure coverage of key constraint-relevant attributes (e.g., sports viewing and service speed).
 

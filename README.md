@@ -15,6 +15,9 @@ Canonical paper artifacts and reproduction instructions are listed in:
 
 Study 1 evaluates whether representation structure affects consistency of constraint-sensitive decisions.
 
+The executed Study 1 extraction set contains 553 venues drawn from `data/study1_venues_20250117.csv`, with 1-5 review objects per venue in the canonical Phase 1 subset.
+Venues were selected prior to evaluation and not filtered based on representation performance.
+
 The experiments examine:
 
 - stability across runs
@@ -74,6 +77,7 @@ Core paper-facing docs:
 - `docs/PAPER_SOURCE_OF_TRUTH.md`
 - `docs/PAPER_STATUS.md`
 - `docs/REPRODUCE_PAPER.md`
+- `data/DATASET_CARD.md`
 
 Canonical paper-backed artifact locations:
 
