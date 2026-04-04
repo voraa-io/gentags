@@ -1,8 +1,8 @@
-# Gentags: Discrete Semantic State for Language-Based Systems
+# Gentags: Discrete Semantic Representations for Decision Fidelity in LLM Pipelines
 
-Gentags are short semantic attributes automatically extracted by large language models from text such as venue reviews.
+Gentags are short, evidence-grounded semantic units automatically extracted by large language models from text such as venue reviews.
 
-This repository contains the full experimental pipeline and frozen artifacts supporting the Gentags paper. The project studies whether discrete semantic units extracted from text can improve consistency in constraint-sensitive decisions compared to lexical keyword representations.
+This repository contains the full experimental pipeline and frozen artifacts supporting the Gentags paper. The project studies whether the structure of an intermediate semantic representation affects decision fidelity in constraint-sensitive LLM pipelines.
 
 Canonical paper artifacts and reproduction instructions are listed in:
 
@@ -13,7 +13,7 @@ Canonical paper artifacts and reproduction instructions are listed in:
 
 ## Project
 
-Study 1 evaluates whether representation structure affects consistency of constraint-sensitive decisions.
+Study 1 evaluates whether discrete semantic state improves constraint-sensitive decisions relative to lexical baselines.
 
 The executed Study 1 extraction set contains 553 venues drawn from `data/study1_venues_20250117.csv`, with 1-5 review objects per venue in the canonical Phase 1 subset.
 Venues were selected prior to evaluation and not filtered based on representation performance.
@@ -24,7 +24,7 @@ The experiments examine:
 - sensitivity to prompt variation
 - cross-model agreement
 - structural properties of extracted tags
-- downstream decision behavior compared to lexical baselines
+- downstream decision fidelity compared to lexical baselines (`RAKE`, `YAKE`, `TF-IDF`)
 
 Out of scope for this repo:
 
@@ -45,15 +45,15 @@ Gentags are:
 - usable as structured semantic features
 - designed for sparse text settings
 
-They function as compact semantic hypotheses derived from evidence text.
+They function as compact semantic hypotheses derived from evidence text and can be inspected, compared across runs, and consumed as structured intermediate state by downstream decision procedures.
 
 ---
 
-## Key Findings
+## Main Result
 
 - Gentags show high semantic stability across runs (`cosine = 0.977`).
-- Gentags improve agreement with full-evidence decisions compared to lexical baselines.
-- Gentags improve hard-constraint compliance in controlled decision tasks.
+- Gentags improve agreement with full-evidence reference decisions to `79.5%` versus `52.3-61.6%` for lexical baselines.
+- Gentags improve hard-constraint compliance to `97.3%` versus `84.7-89.3%` for lexical baselines under matched conditions.
 
 More detailed results are in `docs/PAPER_complete.md`.
 
