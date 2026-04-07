@@ -24,7 +24,6 @@ data/external/
 *.txt
 !data/sample/*.csv
 !data/study1_venues_*.csv
-!data/gentags_global_deduped.csv
 !data/gentags_deduped_by_venue.csv
 
 # Results (keep meta and examples, ignore full results)
