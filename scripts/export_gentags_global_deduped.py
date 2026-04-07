@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """
-Build a global deduped gentag table: one row per distinct normalized tag.
+Export deduped gentag tables from Phase 1 per-line tag CSVs (*_tags_<model>.csv).
 
-Reads Phase 1 per-line tag CSVs (*_tags_<model>.csv), keeps rows with
-status=success, aggregates tag_norm (lower/strip) across all venues and models.
+1) Global: one row per distinct normalized tag (across all venues).
+2) Venue: one row per (venue_id, tag) with frequency/models/prompts for that venue only.
 
-Output columns:
-  tag_id, tag, frequency, modelCount, wordCount, models, prompts, extraction_run_id
+Rows use status=success and tag_norm strip+lower.
 
-tag_id is UUID v5(TAG_ID_NAMESPACE, tag) so the same normalized tag always gets
-the same id when this script is re-run.
+tag_id:
+  - global: UUID v5(TAG_ID_NAMESPACE, tag)
+  - venue: UUID v5(VENUE_TAG_ID_NAMESPACE, f"{venue_id}\\0{tag}")
 
 Usage:
   python scripts/export_gentags_global_deduped.py
 
-Writes data/gentags_global_deduped.csv by default (override with --output).
+Defaults:
+  data/gentags_global_deduped.csv   — one row per tag (whole run), no venue
+  data/gentags_deduped_by_venue.csv — one row per (venue_id, tag); has venueName
 """
 
 from __future__ import annotations
@@ -27,14 +29,15 @@ from collections import defaultdict
 from pathlib import Path
 from glob import glob
 
-# Stable namespace for tag string -> tag_id. Do not change between exports.
+# Stable namespaces; do not change between exports.
 TAG_ID_NAMESPACE = uuid.UUID("f47ac10b-58cc-4372-a567-0e02b2c3d479")
+VENUE_TAG_ID_NAMESPACE = uuid.UUID("a8b3c4d5-e6f7-4890-a1b2-c3d4e5f60789")
 
 
 def parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parent.parent
     default_glob = str(root / "results/phase1_downloaded/week2_run_*_tags_*.csv")
-    parser = argparse.ArgumentParser(description="Export global deduped gentags CSV.")
+    parser = argparse.ArgumentParser(description="Export deduped gentags CSVs (global + venue).")
     parser.add_argument(
         "--tags-glob",
         type=str,
@@ -42,16 +45,32 @@ def parse_args() -> argparse.Namespace:
         help="Glob for per-line tag CSV files (default: phase1_downloaded/week2_run_*_tags_*.csv).",
     )
     parser.add_argument(
-        "--output",
+        "--output-global",
         type=str,
         default=str(root / "data/gentags_global_deduped.csv"),
-        help="Output CSV path (default: data/gentags_global_deduped.csv).",
+        help="Global deduped CSV (default: data/gentags_global_deduped.csv).",
+    )
+    parser.add_argument(
+        "--output-venue",
+        type=str,
+        default=str(root / "data/gentags_deduped_by_venue.csv"),
+        help="Venue deduped CSV (default: data/gentags_deduped_by_venue.csv).",
     )
     parser.add_argument(
         "--extraction-run-id",
         type=str,
         default="",
         help="Stored in extraction_run_id column. Default: inferred from first input filename.",
+    )
+    parser.add_argument(
+        "--skip-global",
+        action="store_true",
+        help="Only write the venue CSV.",
+    )
+    parser.add_argument(
+        "--skip-venue",
+        action="store_true",
+        help="Only write the global CSV.",
     )
     return parser.parse_args()
 
@@ -66,6 +85,15 @@ def infer_run_id(paths: list[Path]) -> str:
     return paths[0].stem
 
 
+def empty_bucket() -> dict:
+    return {
+        "frequency": 0,
+        "models": set(),
+        "prompts": set(),
+        "word_counts": [],
+    }
+
+
 def main() -> int:
     args = parse_args()
     paths = sorted(Path(p) for p in glob(args.tags_glob))
@@ -74,17 +102,10 @@ def main() -> int:
         return 1
 
     run_id = args.extraction_run_id or infer_run_id(paths)
-    out_path = Path(args.output)
 
-    # tag -> aggregates
-    agg: dict[str, dict] = defaultdict(
-        lambda: {
-            "frequency": 0,
-            "models": set(),
-            "prompts": set(),
-            "word_counts": [],
-        }
-    )
+    agg_global: dict[str, dict] = defaultdict(empty_bucket)
+    agg_venue: dict[tuple[str, str], dict] = defaultdict(empty_bucket)
+    venue_names: dict[str, str] = {}
 
     for fp in paths:
         with fp.open(newline="", encoding="utf-8") as f:
@@ -96,59 +117,123 @@ def main() -> int:
                 tag = raw.strip().lower()
                 if not tag:
                     continue
-                bucket = agg[tag]
-                bucket["frequency"] += 1
+                vid = (row.get("venue_id") or "").strip()
+                if not vid:
+                    continue
+                vname = (row.get("venue_name") or "").strip()
+                venue_names[vid] = vname
+
+                g = agg_global[tag]
+                g["frequency"] += 1
                 mk = (row.get("model_key") or "").strip()
                 if mk:
-                    bucket["models"].add(mk)
+                    g["models"].add(mk)
                 pt = (row.get("prompt_type") or "").strip()
                 if pt:
-                    bucket["prompts"].add(pt)
+                    g["prompts"].add(pt)
                 try:
-                    bucket["word_counts"].append(int(row.get("word_count") or 0))
+                    g["word_counts"].append(int(row.get("word_count") or 0))
                 except ValueError:
-                    bucket["word_counts"].append(0)
+                    g["word_counts"].append(0)
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = [
-        "tag_id",
-        "tag",
-        "frequency",
-        "modelCount",
-        "wordCount",
-        "models",
-        "prompts",
-        "extraction_run_id",
-    ]
+                key = (vid, tag)
+                v = agg_venue[key]
+                v["frequency"] += 1
+                if mk:
+                    v["models"].add(mk)
+                if pt:
+                    v["prompts"].add(pt)
+                try:
+                    v["word_counts"].append(int(row.get("word_count") or 0))
+                except ValueError:
+                    v["word_counts"].append(0)
 
-    rows_out = []
-    for tag, data in agg.items():
+    def finalize_row(data: dict) -> dict:
         wcs = data["word_counts"]
         word_count = max(wcs) if wcs else 0
-        models = ",".join(sorted(data["models"]))
-        prompts = ",".join(sorted(data["prompts"]))
-        tid = str(uuid.uuid5(TAG_ID_NAMESPACE, tag))
-        rows_out.append(
-            {
-                "tag_id": tid,
-                "tag": tag,
-                "frequency": data["frequency"],
-                "modelCount": len(data["models"]),
-                "wordCount": word_count,
-                "models": models,
-                "prompts": prompts,
-                "extraction_run_id": run_id,
-            }
-        )
+        return {
+            "frequency": data["frequency"],
+            "modelCount": len(data["models"]),
+            "wordCount": word_count,
+            "models": ",".join(sorted(data["models"])),
+            "prompts": ",".join(sorted(data["prompts"])),
+        }
 
-    rows_out.sort(key=lambda r: (-r["frequency"], r["tag"]))
+    if not args.skip_global:
+        out_global = Path(args.output_global)
+        out_global.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames_g = [
+            "tag_id",
+            "tag",
+            "frequency",
+            "modelCount",
+            "wordCount",
+            "models",
+            "prompts",
+            "extraction_run_id",
+        ]
+        rows_g = []
+        for tag, data in agg_global.items():
+            fin = finalize_row(data)
+            rows_g.append(
+                {
+                    "tag_id": str(uuid.uuid5(TAG_ID_NAMESPACE, tag)),
+                    "tag": tag,
+                    "frequency": fin["frequency"],
+                    "modelCount": fin["modelCount"],
+                    "wordCount": fin["wordCount"],
+                    "models": fin["models"],
+                    "prompts": fin["prompts"],
+                    "extraction_run_id": run_id,
+                }
+            )
+        rows_g.sort(key=lambda r: (-r["frequency"], r["tag"]))
+        with out_global.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames_g)
+            w.writeheader()
+            w.writerows(rows_g)
+        print(f"Wrote {len(rows_g)} rows to {out_global}")
 
-    with out_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(rows_out)
+    if not args.skip_venue:
+        out_venue = Path(args.output_venue)
+        out_venue.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames_v = [
+            "venue_id",
+            "venueName",
+            "tag_id",
+            "tag",
+            "frequency",
+            "modelCount",
+            "wordCount",
+            "models",
+            "prompts",
+            "extraction_run_id",
+        ]
+        rows_v = []
+        for (vid, tag), data in agg_venue.items():
+            fin = finalize_row(data)
+            pair_key = f"{vid}\0{tag}"
+            rows_v.append(
+                {
+                    "venue_id": vid,
+                    "venueName": venue_names.get(vid, ""),
+                    "tag_id": str(uuid.uuid5(VENUE_TAG_ID_NAMESPACE, pair_key)),
+                    "tag": tag,
+                    "frequency": fin["frequency"],
+                    "modelCount": fin["modelCount"],
+                    "wordCount": fin["wordCount"],
+                    "models": fin["models"],
+                    "prompts": fin["prompts"],
+                    "extraction_run_id": run_id,
+                }
+            )
+        rows_v.sort(key=lambda r: (r["venue_id"], -r["frequency"], r["tag"]))
+        with out_venue.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames_v)
+            w.writeheader()
+            w.writerows(rows_v)
+        print(f"Wrote {len(rows_v)} rows to {out_venue}")
 
-    print(f"Wrote {len(rows_out)} rows to {out_path}")
     return 0
 
 
