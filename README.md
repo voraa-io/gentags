@@ -1,4 +1,4 @@
-# Gentags: Discrete Semantic Representations for Decision Fidelity in LLM Pipelines
+# Gentags: Discrete Semantic State for Constraint-Sensitive Decision Pipelines
 
 Gentags are short, evidence-grounded semantic units automatically extracted by large language models from text such as venue reviews.
 
