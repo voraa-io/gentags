@@ -8,10 +8,17 @@ LLM pipelines that act on textual evidence face two practical difficulties: (1) 
 
 This repository contains the full experimental pipeline and frozen artifacts supporting the Gentags paper.
 
+## Paper
+
+**Preprint:** [Gentags: Discrete Semantic State for Constraint-Sensitive Decision Pipelines](https://openreview.net/forum?id=Vm1P4G8RLb)
+**Venue:** OpenReview Archive
+**License:** CC BY 4.0
+**Code license:** MIT
+
 Canonical paper artifacts and reproduction instructions are listed in:
 
-- `docs/REPRODUCE_PAPER.md`
-- `docs/PAPER_SOURCE_OF_TRUTH.md`
+* `docs/REPRODUCE_PAPER.md`
+* `docs/PAPER_SOURCE_OF_TRUTH.md`
 
 ---
 
@@ -41,22 +48,21 @@ The central comparison is against lexical baselines (RAKE, YAKE, TF-IDF) that al
 
 Study 1 evaluates whether discrete semantic state improves constraint-sensitive decisions relative to lexical baselines.
 
-The executed Study 1 extraction set contains 553 venues drawn from `data/study1_venues_20250117.csv`, with 1-5 review objects per venue in the canonical Phase 1 subset.
-Venues were selected prior to evaluation and not filtered based on representation performance.
+The executed Study 1 extraction set contains 553 venues drawn from `data/study1_venues_20250117.csv`, with 1-5 review objects per venue in the canonical Phase 1 subset. Venues were selected prior to evaluation and not filtered based on representation performance.
 
 The experiments examine:
 
-- stability across runs
-- sensitivity to prompt variation
-- cross-model agreement
-- structural properties of extracted tags
-- downstream decision fidelity compared to lexical baselines (`RAKE`, `YAKE`, `TF-IDF`)
+* stability across runs
+* sensitivity to prompt variation
+* cross-model agreement
+* structural properties of extracted tags
+* downstream decision fidelity compared to lexical baselines (`RAKE`, `YAKE`, `TF-IDF`)
 
 Out of scope for this repo:
 
-- recommendation training
-- user interaction data
-- UX evaluation
+* recommendation training
+* user interaction data
+* UX evaluation
 
 ---
 
@@ -64,12 +70,12 @@ Out of scope for this repo:
 
 Gentags are:
 
-- extracted zero-shot from text
-- short (1-4 words)
-- schema-free
-- interpretable by humans
-- usable as structured semantic features
-- designed for sparse text settings
+* extracted zero-shot from text
+* short (1-4 words)
+* schema-free
+* interpretable by humans
+* usable as structured semantic features
+* designed for sparse text settings
 
 They function as compact semantic hypotheses derived from evidence text and can be inspected, compared across runs, and consumed as structured intermediate state by downstream decision procedures.
 
@@ -77,10 +83,10 @@ They function as compact semantic hypotheses derived from evidence text and can 
 
 ## Main Result
 
-- Gentags show high semantic stability across runs (`cosine = 0.977`).
-- Gentags improve agreement with full-evidence reference decisions to **79.5%** versus **52.3–61.6%** for lexical baselines.
-- Gentags improve hard-constraint compliance to **97.3%** versus **84.7–89.3%** for lexical baselines under matched conditions.
-- Gentags show **greater stability across runs, prompts, and extractor models** than the lexical baselines in this study.
+* Gentags show high semantic stability across runs (`cosine = 0.977`).
+* Gentags improve agreement with full-evidence reference decisions to **79.5%** versus **52.3–61.6%** for lexical baselines.
+* Gentags improve hard-constraint compliance to **97.3%** versus **84.7–89.3%** for lexical baselines under matched conditions.
+* Gentags show **greater stability across runs, prompts, and extractor models** than the lexical baselines in this study.
 
 More detailed results are in `docs/PAPER_complete.md`.
 
@@ -100,20 +106,20 @@ notebooks/     Exploratory analysis notebooks
 
 Core paper-facing docs:
 
-- `docs/PAPER_complete.md`
-- `docs/PAPER_SOURCE_OF_TRUTH.md`
-- `docs/PAPER_STATUS.md`
-- `docs/REPRODUCE_PAPER.md`
-- `data/DATASET_CARD.md`
+* `docs/PAPER_complete.md`
+* `docs/PAPER_SOURCE_OF_TRUTH.md`
+* `docs/PAPER_STATUS.md`
+* `docs/REPRODUCE_PAPER.md`
+* `data/DATASET_CARD.md`
 
 Canonical paper-backed artifact locations:
 
-- `results/phase1_downloaded/`
-- `results/phase2/`
-- `results/phase3/`
-- `results/phase3a/`
-- `results/phase4/`
-- `results/phase5/`
+* `results/phase1_downloaded/`
+* `results/phase2/`
+* `results/phase3/`
+* `results/phase3a/`
+* `results/phase4/`
+* `results/phase5/`
 
 ---
 
@@ -145,9 +151,9 @@ poetry run python scripts/run_phase1.py \
 
 Environment notes:
 
-- Python and dependency management are handled through Poetry.
-- API keys belong in `.env` when running extraction or other model-backed scripts.
-- Full paper reproduction guidance is in `docs/REPRODUCE_PAPER.md`.
+* Python and dependency management are handled through Poetry.
+* API keys belong in `.env` when running extraction or other model-backed scripts.
+* Full paper reproduction guidance is in `docs/REPRODUCE_PAPER.md`.
 
 ---
 
@@ -157,18 +163,20 @@ Use `docs/REPRODUCE_PAPER.md` as the main operational guide.
 
 That file covers:
 
-- canonical artifact paths
-- phase-by-phase commands
-- frozen vs expensive stages
-- which outputs back the paper
+* canonical artifact paths
+* phase-by-phase commands
+* frozen vs expensive stages
+* which outputs back the paper
 
 ---
 
-## Paper
+## Paper And Reproducibility
 
-- Draft: `docs/PAPER_complete.md`
-- Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
-- Submission status: `docs/PAPER_STATUS.md`
+* Public preprint: https://openreview.net/forum?id=Vm1P4G8RLb
+* Draft/source copy: `docs/PAPER_complete.md`
+* Claim-to-artifact map: `docs/PAPER_SOURCE_OF_TRUTH.md`
+* Submission status: `docs/PAPER_STATUS.md`
+* Reproduction guide: `docs/REPRODUCE_PAPER.md`
 
 ---
 
@@ -176,16 +184,28 @@ That file covers:
 
 Study 1 repo status:
 
-- Phase 1: complete
-- Phase 2: complete
-- Phase 3: complete
-- Phase 4: complete (supporting mechanism evidence)
-- Phase 5: complete
+* Phase 1: complete
+* Phase 2: complete
+* Phase 3: complete
+* Phase 4: complete (supporting mechanism evidence)
+* Phase 5: complete
+
+---
+
+## Data Availability
+
+The repository provides paper-facing documentation, prompts, scripts, manifests, derived results, and archived outputs where permitted.
+
+Raw third-party review text may be subject to redistribution, privacy, or platform-term restrictions and is not intended to be redistributed where those restrictions apply. The reproducibility materials are designed to support inspection of the experimental protocol and reproduction of reported metrics on an authorized copy of the data.
 
 ---
 
 ## License And Citation
 
-This repository is released under the MIT License.
+The code in this repository is released under the MIT License.
+
+The public preprint is available on OpenReview Archive under CC BY 4.0:
+
+https://openreview.net/forum?id=Vm1P4G8RLb
 
 Citation metadata is provided in `CITATION.cff`.
